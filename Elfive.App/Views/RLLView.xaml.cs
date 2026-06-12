@@ -1,20 +1,26 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Elfive.Core.RLL;
+using L5X.Base;
 using Parallel = Elfive.Core.RLL.Parallel;
 
 namespace Elfive.App.Views;
 
-public partial class LadderViewer : UserControl
+public partial class RLLView : UserControl
 {
-    private const double CellWidth = 160;
     private const double CellHeight = 48;
-    private const double RailWidth = 16;
+    private const double RailWidth = 16;   // right-side inset
+    private const double LeftMargin = 56;  // space left of left rail (rung number)
+    private const double RungPadding = 24;
+    private int _columnCount = 12;
 
     private readonly RungParser _parser = new();
     private readonly StackPanel _container = new();
-    public LadderViewer()
+    private readonly TextBlock _header;
+    private Rung[] _displayedRungs;
+    private IReadOnlyDictionary<string, string> _tagValues = new Dictionary<string, string>();
+    public RLLView()
     {
         var scroll = new ScrollViewer
         {
@@ -22,11 +28,57 @@ public partial class LadderViewer : UserControl
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto
         };
-        Content = scroll;
 
-        DataContextChanged += (s, e) => Render();
+        _header = new TextBlock
+        {
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Padding = new Thickness(8, 4, 8, 4),
+            Background = new SolidColorBrush(Color.FromRgb(235, 240, 250)),
+            Foreground = new SolidColorBrush(Color.FromRgb(30, 60, 120))
+        };
+
+        var dock = new DockPanel();
+        DockPanel.SetDock(_header, Dock.Top);
+        dock.Children.Add(_header);
+        dock.Children.Add(scroll);
+        Content = dock;
+        _displayedRungs = [];
+
+        DataContextChanged += (s, e) => LoadRungs();
+        SizeChanged += (s, e) => Render();
     }
-     private void Render()
+
+    private void LoadRungs()
+    {
+        var parser = new RungParser();
+        _displayedRungs = [];
+
+        if (DataContext is TreeNode<IRoutine> { Source: { Content: IRllContent } routine })
+            _displayedRungs = parser.ParseRoutineRungs(routine);
+
+        if (DataContext is TreeNode<IRoutine> node)
+        {
+            var programName = node.Parent?.Name ?? "";
+            _header.Text = string.IsNullOrEmpty(programName)
+                ? node.Name ?? ""
+                : $"{node.Name}   —   {programName}";
+        }
+
+        _columnCount = _displayedRungs.Length > 0
+            ? Math.Max(8, _displayedRungs.Max(r => r.Size.Width) + 1)
+            : 8;
+        Render();
+    }
+
+    private double GetCellWidth()
+    {
+        var available = ActualWidth - LeftMargin - RailWidth;
+        return available > 0 ? available / _columnCount : 60;
+    }
+
+    private void Render()
     {
         _container.Children.Clear();
 
@@ -34,58 +86,105 @@ public partial class LadderViewer : UserControl
             Window.GetWindow(this)?.DataContext is not MainViewModel vm)
             return;
 
-        var rungTexts = MainViewModel.GetRungText(node); // you'll need to expose this
+        _tagValues = vm.ControllerTagValues;
+        var cellWidth = GetCellWidth();
+        var leftRailX = LeftMargin;
+        var rightRailX = LeftMargin + _columnCount * cellWidth;
+        var totalWidth = rightRailX + RailWidth;
 
-        foreach (var (text, comment, number) in rungTexts)
+        foreach (var rung in _displayedRungs)
         {
             // Rung comment header
-            if (!string.IsNullOrEmpty(comment))
+            if (!string.IsNullOrEmpty(rung.Comment))
             {
                 _container.Children.Add(new TextBlock
                 {
-                    Text = $"Rung {number}: {comment}",
-                    Margin = new Thickness(RailWidth, 8, 0, 2),
+                    Text = $"Rung {rung.Number}: {rung.Comment}",
+                    Margin = new Thickness(LeftMargin, 8, 0, 2),
                     Foreground = Brushes.Green,
                     FontFamily = new FontFamily("Consolas"),
                     FontStyle = FontStyles.Italic
                 });
             }
 
-            // Parse and render
-            var series = _parser.Parse(text);
-            var size = LayoutCalculator.Measure(series);
+            // Ladder Render
+            var rungHeight = rung.Size.Height * CellHeight;
             var canvas = new Canvas
             {
-                Width = RailWidth + (size.Width * CellWidth) + RailWidth,
-                Height = size.Height * CellHeight,
-                Margin = new Thickness(0, 0, 0, 4)
+                Width = totalWidth,
+                Height = rungHeight + RungPadding,
             };
 
-            // Draw left rail
+            // Rung number (3 digits) to the left of the left rail
+            var rungLabel = new TextBlock
+            {
+                Text = rung.Number.ToString("D3"),
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 11,
+                Foreground = Brushes.DarkGray,
+            };
+            rungLabel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            Canvas.SetLeft(rungLabel, 4);
+            Canvas.SetTop(rungLabel, rungHeight / 2 - rungLabel.DesiredSize.Height / 2);
+            canvas.Children.Add(rungLabel);
+
+            // Left rail
             canvas.Children.Add(MakeLine(
-                RailWidth, 0, RailWidth, size.Height * CellHeight,
+                leftRailX, 0, leftRailX, rungHeight + RungPadding,
                 Brushes.DarkBlue, 2));
 
-            // Draw right rail
-            var rightX = RailWidth + size.Width * CellWidth;
+            // Right rail
             canvas.Children.Add(MakeLine(
-                rightX, 0, rightX, size.Height * CellHeight,
+                rightRailX, 0, rightRailX, rungHeight + RungPadding,
                 Brushes.DarkBlue, 2));
 
-            // Draw the rung content
-            DrawElement(canvas, series, RailWidth, 0, size.Width);
+            // Draw rung content — output instructions pinned to right rail
+            if (rung.Root.Elements.Count > 0 && IsOutput(rung.Root.Elements[^1]))
+            {
+                var output = rung.Root.Elements[^1];
+                var outputWidth = LayoutCalculator.Measure(output).Width;
+                var outputStartX = rightRailX - outputWidth * cellWidth;
+
+                // Draw input elements from left rail
+                var inputX = leftRailX;
+                foreach (var el in rung.Root.Elements.Take(rung.Root.Elements.Count - 1))
+                {
+                    var elW = LayoutCalculator.Measure(el).Width;
+                    DrawElement(canvas, el, inputX, 0, elW, cellWidth);
+                    inputX += elW * cellWidth;
+                }
+
+                // Wire bridging input end to output start
+                if (inputX < outputStartX)
+                    canvas.Children.Add(MakeLine(
+                        inputX, CellHeight / 2, outputStartX, CellHeight / 2,
+                        Brushes.Black, 1));
+
+                // Draw output at right rail
+                DrawElement(canvas, output, outputStartX, 0, outputWidth, cellWidth);
+            }
+            else
+            {
+                DrawElement(canvas, rung.Root, leftRailX, 0, rung.Size.Width, cellWidth);
+
+                var contentEndX = leftRailX + rung.Size.Width * cellWidth;
+                if (contentEndX < rightRailX)
+                    canvas.Children.Add(MakeLine(
+                        contentEndX, CellHeight / 2, rightRailX, CellHeight / 2,
+                        Brushes.Black, 1));
+            }
 
             _container.Children.Add(canvas);
         }
     }
 
     private void DrawElement(Canvas canvas, IRungElement element,
-        double x, double y, int availableWidth)
+        double x, double y, int elementWidth, double cellWidth)
     {
         switch (element)
         {
             case Instruction inst:
-                DrawInstruction(canvas, inst, x, y);
+                DrawInstruction(canvas, inst, x, y, cellWidth);
                 break;
 
             case Series series:
@@ -93,32 +192,28 @@ public partial class LadderViewer : UserControl
                 foreach (var child in series.Elements)
                 {
                     var childSize = LayoutCalculator.Measure(child);
-                    DrawElement(canvas, child, seriesX, y, childSize.Width);
-                    seriesX += childSize.Width * CellWidth;
+                    DrawElement(canvas, child, seriesX, y, childSize.Width, cellWidth);
+                    seriesX += childSize.Width * cellWidth;
                 }
                 break;
 
             case Parallel parallel:
                 var branchY = y;
                 var parallelWidth = LayoutCalculator.Measure(parallel).Width;
+                const double vInset = 5.0; // gap between adjacent parallel blocks
                 foreach (var branch in parallel.Branches)
                 {
                     var branchSize = LayoutCalculator.Measure(branch);
 
-                    // Horizontal wire from left edge to branch start
                     var wireY = branchY + CellHeight / 2;
-                    canvas.Children.Add(MakeLine(
-                        x, wireY, x, wireY, Brushes.Black, 1));
+                    DrawElement(canvas, branch, x, branchY, branchSize.Width, cellWidth);
 
-                    // Draw branch content
-                    DrawElement(canvas, branch, x, branchY, parallelWidth);
-
-                    // Extend wire to fill available width if branch is shorter
+                    // Extend wire to fill parallel width if branch is shorter
                     var branchWidth = LayoutCalculator.Measure(branch).Width;
                     if (branchWidth < parallelWidth)
                     {
-                        var wireEnd = x + parallelWidth * CellWidth;
-                        var wireStart = x + branchWidth * CellWidth;
+                        var wireStart = x + branchWidth * cellWidth;
+                        var wireEnd = x + parallelWidth * cellWidth;
                         canvas.Children.Add(MakeLine(
                             wireStart, wireY, wireEnd, wireY,
                             Brushes.Black, 1));
@@ -127,32 +222,47 @@ public partial class LadderViewer : UserControl
                     branchY += branchSize.Height * CellHeight;
                 }
 
-                // Vertical connections on left and right of branch
+                // Vertical connection bars — inset from element boundaries so adjacent
+                // parallel blocks don't visually merge into a grid
                 var topWireY = y + CellHeight / 2;
                 var bottomWireY = branchY - CellHeight / 2;
-                // Left vertical
                 canvas.Children.Add(MakeLine(
-                    x, topWireY, x, bottomWireY, Brushes.Black, 1));
-                // Right vertical
-                var rightEdge = x + parallelWidth * CellWidth;
+                    x + vInset, topWireY, x + vInset, bottomWireY, Brushes.Black, 1));
+                var rightEdge = x + parallelWidth * cellWidth - vInset;
                 canvas.Children.Add(MakeLine(
-                    rightEdge, topWireY, rightEdge, bottomWireY,
-                    Brushes.Black, 1));
+                    rightEdge, topWireY, rightEdge, bottomWireY, Brushes.Black, 1));
                 break;
         }
     }
 
     private void DrawInstruction(Canvas canvas, Instruction inst,
-        double x, double y)
+        double x, double y, double cellWidth)
     {
         var centerY = y + CellHeight / 2;
-        var rightEdge = x + CellWidth;
+        var rightEdge = x + cellWidth;
+
+        // Semi-opaque highlight when the instruction's tag is energized (value = 1)
+        if (BoolInstructions.Contains(inst.Name)
+            && inst.Arguments.Length > 0
+            && _tagValues.TryGetValue(inst.Arguments[0], out var tagVal)
+            && tagVal == "1")
+        {
+            var highlight = new System.Windows.Shapes.Rectangle
+            {
+                Width = cellWidth*0.5,
+                Height = CellHeight*0.25,
+                Fill = new SolidColorBrush(Color.FromArgb(75, 0, 180, 0)),
+            };
+            Canvas.SetLeft(highlight, x + (cellWidth - highlight.Width) / 2 );
+            Canvas.SetTop(highlight, y + (CellHeight - highlight.Height) / 2);
+            canvas.Children.Add(highlight);
+        }
 
         // Horizontal wire through the cell
         canvas.Children.Add(MakeLine(
             x, centerY, rightEdge, centerY, Brushes.Black, 1));
 
-        var midX = x + CellWidth / 2;
+        var midX = x + cellWidth / 2;
 
         // Categorize and draw the symbol
         switch (inst.Name.ToUpper())
@@ -176,11 +286,11 @@ public partial class LadderViewer : UserControl
                 DrawContact(canvas, midX, centerY, false, "↑");
                 break;
             default: // Everything else: box instruction
-                DrawBoxInstruction(canvas, inst, x, y);
+                DrawBoxInstruction(canvas, inst, x, y, cellWidth);
                 return; // skip the operand label below
         }
 
-        // Operand label below the symbol
+        // Operand label above the symbol
         if (inst.Arguments.Length > 0)
         {
             var label = new TextBlock
@@ -192,7 +302,7 @@ public partial class LadderViewer : UserControl
             };
             label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             Canvas.SetLeft(label, midX - label.DesiredSize.Width / 2);
-            Canvas.SetTop(label, centerY + 10);
+            Canvas.SetTop(label, centerY - 12 - label.DesiredSize.Height);
             canvas.Children.Add(label);
         }
     }
@@ -267,12 +377,12 @@ public partial class LadderViewer : UserControl
     }
 
     private void DrawBoxInstruction(Canvas canvas, Instruction inst,
-        double x, double y)
+        double x, double y, double cellWidth)
     {
         var margin = 12.0;
         var rect = new System.Windows.Shapes.Rectangle
         {
-            Width = CellWidth - margin * 2,
+            Width = cellWidth - margin * 2,
             Height = CellHeight - 8,
             Stroke = Brushes.Blue, StrokeThickness = 1.5,
             Fill = Brushes.White
@@ -307,6 +417,20 @@ public partial class LadderViewer : UserControl
             canvas.Children.Add(opLabel);
         }
     }
+
+    private static readonly HashSet<string> InputInstructions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "XIC", "XIO", "ONS", "OSR", "OSF",
+        "GRT", "GEQ", "LES", "LEQ", "EQU", "NEQ", "CMP"
+    };
+
+    private static readonly HashSet<string> BoolInstructions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "XIC", "XIO", "OTE", "OTL", "OTU", "ONS"
+    };
+
+    private static bool IsOutput(IRungElement element) =>
+        element is Instruction inst && !InputInstructions.Contains(inst.Name);
 
     private static System.Windows.Shapes.Line MakeLine(
         double x1, double y1, double x2, double y2,

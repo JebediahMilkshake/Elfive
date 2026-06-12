@@ -8,10 +8,10 @@ public class NodeTemplateSelector : DataTemplateSelector
 {
     public DataTemplate? EmptyTemplate { get; set; }
     public DataTemplate? TagsTemplate { get; set; }
-    public DataTemplate? TextTemplate { get; set; }
-    public DataTemplate? LadderTemplate { get; set; }
-    public DataTemplate? BlockTemplate { get; set; }
-    public DataTemplate? SequenceTemplate { get; set; }
+    public DataTemplate? StTemplate { get; set; }
+    public DataTemplate? RllTemplate { get; set; }
+    public DataTemplate? FdbTemplate { get; set; }
+    public DataTemplate? SfcTemplate { get; set; }
     public DataTemplate? ModuleTemplate { get; set; }
 
     public override DataTemplate? SelectTemplate(object? item, DependencyObject container)
@@ -21,21 +21,22 @@ public class NodeTemplateSelector : DataTemplateSelector
         return node.NodeType switch
         {
             "Tags" or "Program" => TagsTemplate,
-            "Routine" => GetRoutineTemplate(node),
-            "Module"  => ModuleTemplate,
-            _         => EmptyTemplate
+            "Routine" => (item is TreeNode<IRoutine> routine) ? GetRoutineTemplate(routine) : null,
+            "FbdSheet" => FdbTemplate,
+            "Module" => ModuleTemplate,
+            _ => EmptyTemplate
         };
     }
 
-    private DataTemplate? GetRoutineTemplate(TreeNode node)
+    private DataTemplate? GetRoutineTemplate(TreeNode<IRoutine> node)
     {
-        var routine = node.Source as IRoutine;
+        var routine = node.Source;
         return routine!.Content switch
         {
-            IStContent => TextTemplate,
-            IRllContent => LadderTemplate,
-            IFbdContent => BlockTemplate,
-            ISfcContent => SequenceTemplate,
+            IStContent => StTemplate,
+            IRllContent => RllTemplate,
+            IFbdContent => FdbTemplate,
+            ISfcContent => SfcTemplate,
             _ => throw new NotSupportedException()
         };
     }

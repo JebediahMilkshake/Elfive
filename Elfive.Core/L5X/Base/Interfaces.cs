@@ -69,16 +69,32 @@ public interface IFbdContent : IRoutineContent
 
 public interface IFbdSheet
 {
-    IEnumerable<IFbdBlock> Blocks { get; }
+    ulong Number { get; }
+    string? Description { get; }
+    IEnumerable<IFbdElement> Blocks { get; }
+    IEnumerable<IFbdElement> IRefs { get; }
+    IEnumerable<IFbdElement> ORefs { get; }
+    IEnumerable<IFbdElement> ICons { get; }
+    IEnumerable<IFbdElement> OCons { get; }
+    IEnumerable<IFbdWire> Wires { get; }
 }
 
-public interface IFbdBlock
+public interface IFbdElement
 {
     string? Type { get; }
     ulong Id { get; }
     ulong X { get; }
     ulong Y { get; }
     string? Operand { get; }
+    string? Pins { get; }
+}
+
+public interface IFbdWire
+{
+    ulong FromId { get; }
+    string? FromParam { get; }
+    ulong ToId { get; }
+    string? ToParam { get; }
 }
 
 // Sequence Flow Chart
@@ -125,12 +141,29 @@ public interface IModule
     IEnumerable<IPort>? Ports   { get; }
 }
 
+public interface ITagMember
+{
+    string? Name     { get; }
+    string? DataType { get; }
+    string? Value    { get; }
+    IEnumerable<ITagMember> Children { get; }
+}
+
+public sealed class TagMember : ITagMember
+{
+    public string? Name     { get; init; }
+    public string? DataType { get; init; }
+    public string? Value    { get; init; }
+    public IEnumerable<ITagMember> Children { get; init; } = [];
+}
+
 public interface ITag
 {
     string? Name        { get; }
     string? Description { get; }
     string? DataType    { get; }
     string? Value       { get; }
+    IEnumerable<ITagMember> Children { get; }
 }
 
 public enum TaskScanType { Continuous, Periodic, Event }

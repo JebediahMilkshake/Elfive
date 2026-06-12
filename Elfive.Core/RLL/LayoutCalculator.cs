@@ -10,11 +10,11 @@ public static class LayoutCalculator
             Series s => new LayoutSize
             {
                 Width = s.Elements.Sum(e => Measure(e).Width),
-                Height = s.Elements.Sum(e => Measure(e).Height),
+                Height = s.Elements.Count == 0 ? 1 : s.Elements.Max(e => Measure(e).Height),
             },
             Parallel p => new LayoutSize
             {
-                Width = p.Branches.Sum(e => Measure(e).Width),
+                Width = p.Branches.Count == 0 ? 0 : p.Branches.Max(e => Measure(e).Width),
                 Height = p.Branches.Sum(e => Measure(e).Height),
             },
             _ => new LayoutSize { Width = 0, Height = 0}

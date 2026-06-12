@@ -14329,7 +14329,7 @@ namespace L5X.V32
             this._oRef = new System.Collections.ObjectModel.Collection<FbdORefType>();
             this._iCon = new System.Collections.ObjectModel.Collection<FbdIConType>();
             this._oCon = new System.Collections.ObjectModel.Collection<FbdOConType>();
-            this._block = new System.Collections.ObjectModel.Collection<FbdBlockType>();
+            this._block = new System.Collections.ObjectModel.Collection<FbdElementType>();
             this._addOnInstruction = new System.Collections.ObjectModel.Collection<FbdAoiType>();
             this._gsv = new System.Collections.ObjectModel.Collection<FbdGsvType>();
             this._ssv = new System.Collections.ObjectModel.Collection<FbdSsvType>();
@@ -14455,10 +14455,10 @@ namespace L5X.V32
         }
         
         [System.Xml.Serialization.XmlIgnoreAttribute()]
-        private System.Collections.ObjectModel.Collection<FbdBlockType> _block;
+        private System.Collections.ObjectModel.Collection<FbdElementType> _block;
         
         [System.Xml.Serialization.XmlElementAttribute("Block")]
-        public System.Collections.ObjectModel.Collection<FbdBlockType> Block
+        public System.Collections.ObjectModel.Collection<FbdElementType> Block
         {
             get
             {
@@ -14941,7 +14941,7 @@ namespace L5X.V32
     [System.Diagnostics.DebuggerStepThroughAttribute()]
     [System.ComponentModel.DesignerCategoryAttribute("code")]
     [System.Xml.Serialization.XmlRootAttribute("FBD_BlockType", Namespace="")]
-    public partial class FbdBlockType
+    public partial class FbdElementType
     {
         
         [System.Xml.Serialization.XmlIgnoreAttribute()]
@@ -14973,9 +14973,9 @@ namespace L5X.V32
         }
         
         /// <summary>
-        /// <para xml:lang="en">Initializes a new instance of the <see cref="FbdBlockType" /> class.</para>
+        /// <para xml:lang="en">Initializes a new instance of the <see cref="FbdElementType" /> class.</para>
         /// </summary>
-        public FbdBlockType()
+        public FbdElementType()
         {
             this._array = new System.Collections.ObjectModel.Collection<FbdSpecialArrayType>();
         }

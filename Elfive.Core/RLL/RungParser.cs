@@ -1,11 +1,39 @@
-﻿namespace Elfive.Core.RLL;
+﻿using L5X.Base;
+
+namespace Elfive.Core.RLL;
+
+public struct Rung
+{
+    public ulong Number { get; set; }
+    public string? Comment { get; set; }
+    public string RawText { get; set; }
+    public Series Root { get; set; }
+    public LayoutSize Size { get; set; }
+}
 
 public class RungParser
 {
     private string _text = "";
     private int _pos;
 
-    public Series Parse(string rungText)
+    public Rung[] ParseRoutineRungs(IRoutine routine)
+    {
+        if (routine.Content is not IRllContent rll) return [];
+        return rll.Rungs.Select(r =>
+        {
+            var root = Parse(r.Text ?? "");
+           return new Rung
+            {
+                Number = r.Number,
+                Comment = r.Comment,
+                RawText = r.Text ?? "",
+                Root = root,
+                Size = LayoutCalculator.Measure(root)
+            };
+        }).ToArray();
+    }
+    
+    private Series Parse(string rungText)
     {
         _text = rungText.TrimEnd(';', ' ', '\t', '\r', '\n');
         _pos = 0;
@@ -21,7 +49,9 @@ public class RungParser
             var ch = _text[_pos];
             if (ch == '[')
                 elements.Add(ParseParallel());
-            else if (ch == ',' || ch == ']')
+            else if (ch is ' ')
+                _pos++;
+            else if (ch is ',' or ']')
                 break;
             else
                 elements.Add(ParseInstruction());
@@ -56,7 +86,7 @@ public class RungParser
         _pos++; //skip the (
 
         var arguments = new List<string>();
-        var argStart =  _pos;
+        var argStart = _pos;
 
         int parenDepth = 0;
         int bracketDepth = 0;
@@ -66,14 +96,20 @@ public class RungParser
             var ch = _text[_pos];
             if (ch == '(') parenDepth++;
             else if (ch == '[') bracketDepth++;
-            else if (ch == ']')  bracketDepth--;
+            else if (ch == ']') bracketDepth--;
+            else if (ch == ',' && parenDepth == 0 && bracketDepth == 0)
+            {
+                arguments.Add(_text[argStart.._pos].Trim());
+                argStart = _pos + 1;
+            }
             else if (ch == ')')
             {
-                if (parenDepth > 0) 
+                if (parenDepth > 0)
                     parenDepth--;
                 else
                 {
-                    arguments.Add(_text[argStart.._pos].Trim());
+                    var last = _text[argStart.._pos].Trim();
+                    if (last.Length > 0) arguments.Add(last);
                     _pos++;
                     break;
                 }

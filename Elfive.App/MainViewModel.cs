@@ -1,9 +1,12 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Text;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using L5X.Base;
+using Newtonsoft.Json;
+
 namespace Elfive.App;
 
 public partial class MainViewModel : ObservableObject
@@ -11,6 +14,8 @@ public partial class MainViewModel : ObservableObject
     
     public ObservableCollection<TreeNode> TreeItems { get; } = [];
     private readonly List<TagViewModel> _allTags = [];
+    private readonly Dictionary<string, string> _controllerTagValues = new(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<string, string> ControllerTagValues => _controllerTagValues;
     public ICollectionView? VisibleTags { get; private set; }
 
     [ObservableProperty]
@@ -21,7 +26,9 @@ public partial class MainViewModel : ObservableObject
     private ObservableCollection<TagViewModel> _selectedTags = [];
     [ObservableProperty]
     private string _selectedRoutineContent = "";
-    [ObservableProperty] 
+    [ObservableProperty]
+    private string _selectedRoutineHeader = "";
+    [ObservableProperty]
     private string _controllerName = "";
     [ObservableProperty] 
     private string _processorType = "";
@@ -39,25 +46,75 @@ public partial class MainViewModel : ObservableObject
         TreeItems.Clear();
         _allTags.Clear();
         
-        TreeItems.Add(BuildTagList(controller));
-        TreeItems.Add(BuildPrograms(controller));
-        if (controller != null) TreeItems.Add(BuildIoConfig(controller));
-
+        TreeItems.Add(BuildControllerRootNode(controller!));
+        TreeItems.Add(BuildTasksNode(controller));
+        TreeItems.Add(BuildMotionsGroupsNode(controller));
+        TreeItems.Add(BuildAlarmManagerNode(controller));
+        TreeItems.Add(BuildAssetsNode(controller));
+        TreeItems.Add(BuildIoConfigNode(controller!));
+        
 
         TagCount = _allTags.Count;
     }
 
-    public static IEnumerable<(string text, string? comment, ulong number)> GetRungText(TreeNode node)
+    public static IEnumerable<(string text, string? comment, ulong number)> GetRungText(TreeNode<IRoutine> node)
     {
-        if (node.Source is not IRoutine { Content: IRllContent rll })
+        if (node.Source is not { Content: IRllContent rll })
             yield break;
         foreach (var rung in rll.Rungs)
             yield return (rung.Text, rung.Comment, rung.Number)!;
     }
+    
+    private TreeNode BuildMotionsGroupsNode(IController? controller)
+    {
+        var motionNode = new TreeNode { Name = "Motion Groups", NodeType = "Folder" };
+        
+        //TODO add parsing and data for motion groups
+        
+        motionNode.Children.Add(new TreeNode { Name = "Ungrouped Axes", NodeType = "Folder" });
+
+        return motionNode;
+    }
+
+    private TreeNode BuildAlarmManagerNode(IController? controller)
+    {
+        var alarmNode = new TreeNode { Name = "Alarm Manager", NodeType = "Folder" };
+        //TODO build typed TreeNodes for "Alarm Views", similar tag views
+        //TODO build typed TreeNods for "Alarm Definitions" similar to tag views
+        return alarmNode;
+    }
+
+    private TreeNode BuildAssetsNode(IController? controller)
+    {
+        var assetNode = new TreeNode { Name = "Assets", NodeType = "Folder" };
+        
+        assetNode.Children.Add(new TreeNode { Name = "Add-On Instructions", NodeType = "Folder" });
+        var dataTypesNode = new TreeNode { Name = "Data Types", NodeType = "Folder" };
+        assetNode.Children.Add(dataTypesNode);
+        
+        assetNode.Children.Add(new TreeNode { Name = "Trends", NodeType = "Folder" });
+        
+        dataTypesNode.Children.Add(new TreeNode { Name = "User-Defined", NodeType = "Folder" });
+        dataTypesNode.Children.Add(new TreeNode { Name = "Strings", NodeType = "Folder" });
+        dataTypesNode.Children.Add(new TreeNode { Name = "Add-On-Defined", NodeType = "Folder" });
+        dataTypesNode.Children.Add(new TreeNode { Name = "Predefined", NodeType = "Folder" });
+        dataTypesNode.Children.Add(new TreeNode { Name = "Module-Defined", NodeType = "Folder" });
+
+        return assetNode;
+    }
+
+    private TreeNode BuildControllerRootNode(IController? controller)
+    {
+        var controllerRoot = new TreeNode{Name = $"Controller {controller?.Name ?? "[unnamed]"}",  NodeType = "Folder"}; //TODO create "controller view node type
+        controllerRoot.Children.Add(BuildTagList(controller));
+        controllerRoot.Children.Add(new TreeNode{Name="Controller Fault Handler", NodeType = "Folder"});
+        controllerRoot.Children.Add(new TreeNode{Name="Power-Up Handler",NodeType = "Folder"});
+        return controllerRoot;
+    }
 
     private TreeNode BuildTagList(IController? controller)
     {
-        var node = new TreeNode
+        var node = new TreeNode<IEnumerable<ITag>>
         {
             Name = "Controller Tags",
             NodeType = "Tags",
@@ -65,16 +122,22 @@ public partial class MainViewModel : ObservableObject
         };
         
         if (controller is null) return node;
-        
+
+        _controllerTagValues.Clear();
         foreach (var tag in controller.Tags)
         {
-            _allTags.Add(new TagViewModel
+            var tagChildren = tag.Children.ToList();
+            var vm = new TagViewModel
             {
                 Name = tag.Name ?? "",
-                Value = tag.Value ?? "",
+                Value = tagChildren.Count > 0 ? "{...}" : (tag.Value ?? ""),
                 DataType = tag.DataType ?? "",
-                Description = tag.Description ?? "",
-            });
+                Description = FlattenDescription(tag.Description),
+            };
+            PopulateChildren(vm, tagChildren);
+            _allTags.Add(vm);
+            if (tag.Name != null)
+                _controllerTagValues[tag.Name] = tag.Value ?? "";
         }
         
         SetupTagFiltering();
@@ -82,17 +145,60 @@ public partial class MainViewModel : ObservableObject
         return node;
     }
 
-    private static TreeNode BuildPrograms(IController? controller)
+    private static string FlattenDescription(string? desc) =>
+        string.IsNullOrEmpty(desc)
+            ? ""
+            : string.Join(" ", desc.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+
+    private static void PopulateChildren(TagViewModel parent, IEnumerable<L5X.Base.ITagMember> members, int depth = 1)
     {
-        var programsNode = new TreeNode {Name = "Programs", NodeType = "Folder"};
+        foreach (var m in members)
+        {
+            var childMembers = m.Children.ToList();
+            var child = new TagViewModel
+            {
+                Name = m.Name ?? "",
+                Value = childMembers.Count > 0 ? "{...}" : (m.Value ?? ""),
+                DataType = m.DataType ?? "",
+                Depth = depth,
+            };
+            PopulateChildren(child, childMembers, depth + 1);
+            parent.Children.Add(child);
+        }
+    }
+
+    private static TreeNode BuildTasksNode(IController? controller)
+    {
+        var nodeMap = new Dictionary<string, TreeNode>();
+        var tasks = new TreeNode {Name = "Tasks", NodeType = "Folder"};
         
-        if (controller is null) return programsNode;
+        if (controller is null) return tasks;
         
         try
         {
+            foreach (var task in controller.Tasks)
+            {
+                var taskNode = new TreeNode<ITask>()
+                {
+                    Name = task.Name,
+                    NodeType = "Folder",
+                    Source = task,
+                    Detail = task.Description ?? ""
+                };
+                tasks.Children.Add(taskNode);
+                nodeMap[task.Name!] =  taskNode;
+            }
+            //Add "Unassigned" node
+            var unassigned = new TreeNode<ITask>
+            {
+                Name = "Unassigned",
+                NodeType = "Folder",
+            };
+            tasks.Children.Add(unassigned);
+            
             foreach (var program in controller.Programs)
             {
-                var node = new TreeNode
+                var programNode = new TreeNode<IProgram>
                 {
                     Name = program.Name,
                     NodeType = "Program",
@@ -101,30 +207,56 @@ public partial class MainViewModel : ObservableObject
 
                 foreach (var routine in program.Routines)
                 {
-                    node.Children.Add(new TreeNode
+                    var routineNode = new TreeNode<IRoutine>
                     {
                         Name = routine.Name,
                         NodeType = "Routine",
                         Source = routine,
-                        Detail = routine.Type
-                    });
-                }
+                        Detail = routine.Type,
+                        Parent = programNode
+                    };
 
-                programsNode.Children.Add(node);
+                    if (routine.Content is IFbdContent fbdContent)
+                    {
+                        foreach (var sheet in fbdContent.Sheets)
+                        {
+                            var label = string.IsNullOrEmpty(sheet.Description)
+                                ? $"Sheet {sheet.Number}"
+                                : $"Sheet {sheet.Number}: {sheet.Description}";
+                            routineNode.Children.Add(new TreeNode<IFbdSheet>
+                            {
+                                Name = label,
+                                NodeType = "FbdSheet",
+                                Source = sheet,
+                                Parent = routineNode
+                            });
+                        }
+                    }
+
+                    programNode.Children.Add(routineNode);
+                }
+                
+                var parentTask = controller.Tasks.FirstOrDefault(t => t.Children.Contains(program.Name));
+                if (parentTask?.Name != null && nodeMap.TryGetValue(parentTask.Name, out var taskNode))
+                    taskNode.Children.Add(programNode);
+                else
+                    unassigned.Children.Add(programNode);
+                
+                
             }
         }
         catch (Exception e)
         {
-            programsNode = new TreeNode {Name = "Programs", NodeType = "Folder"};
+            tasks = new TreeNode {Name = "Programs", NodeType = "Folder"};
             Console.WriteLine($"Failed to Build Programs Node: {e}");
         }
 
-        return programsNode;
+        return tasks;
 
         
     }
     
-    private static TreeNode BuildIoConfig(IController controller)
+    private static TreeNode BuildIoConfigNode(IController controller)
     {
         var nodeMap = new Dictionary<string, TreeNode>();
         var root = new TreeNode { Name = "I/O Configuration", NodeType = "Folder" };
@@ -136,7 +268,7 @@ public partial class MainViewModel : ObservableObject
             var modNameString = (module.Slot is {} ? $"[{module.Slot}] " : "") + $"{module.CatalogNumber} : ";
             modNameString += module.Name == "Local" ? controller.Name : module.Name;
             
-            var node = new TreeNode
+            var node = new TreeNode<IModule>
             {
                 Name = modNameString,
                 NodeType = "Module",
@@ -165,7 +297,7 @@ public partial class MainViewModel : ObservableObject
                     portName = $"{port.Type} Backplane";
                 }
 
-                var portNode = new TreeNode
+                var portNode = new TreeNode<IPort>
                 {
                     Name = portName,
                     NodeType = "Folder",
@@ -229,16 +361,19 @@ public partial class MainViewModel : ObservableObject
         switch (value.NodeType)
         {
             case "Tags":
-                IEnumerable<ITag>? cTags = value.Source as IEnumerable<ITag>;
-                LoadTags(cTags);
+                if (value is TreeNode<IEnumerable<ITag>> tagsNode)
+                    LoadTags(tagsNode.Source);
                 break;
             case "Program":
-                IProgram? prog = value.Source as IProgram;
-                IEnumerable<ITag>? pTags = prog?.Tags;
-                LoadTags(pTags);
+                if (value is TreeNode<IProgram> progNode)
+                    LoadTags(progNode.Source?.Tags);
                 break;
             case "Routine":
-                LoadRoutineContent(value.Source as IRoutine);
+                if (value is TreeNode<IRoutine> routineNode)
+                {
+                    LoadRoutineContent(routineNode.Source);
+                    SelectedRoutineHeader = BuildRoutineHeader(routineNode);
+                }
                 break;
         }
     }
@@ -250,15 +385,26 @@ public partial class MainViewModel : ObservableObject
 
         foreach (var tag in tags)
         {
-            _allTags.Add(new TagViewModel
+            var tagChildren = tag.Children.ToList();
+            var vm = new TagViewModel
             {
                 Name = tag.Name ?? "",
-                Value = tag.Value ?? "",
+                Value = tagChildren.Count > 0 ? "{...}" : (tag.Value ?? ""),
                 DataType = tag.DataType ?? "",
-                Description = tag.Description ?? "",
-            });
+                Description = FlattenDescription(tag.Description),
+            };
+            PopulateChildren(vm, tagChildren);
+            _allTags.Add(vm);
         }
         VisibleTags?.Refresh();
+    }
+
+    private static string BuildRoutineHeader(TreeNode node)
+    {
+        var programName = node.Parent?.Name ?? "";
+        return string.IsNullOrEmpty(programName)
+            ? node.Name ?? ""
+            : $"{node.Name}   —   {programName}";
     }
 
     private void LoadRoutineContent(IRoutine? routine)

@@ -52,9 +52,18 @@ public partial class EthernetLinkType : IPort
 
 public partial class TagType : ITag
 {
-    string ITag.Description => Description.FirstOrDefault()?.Value.FirstOrDefault() ?? string.Empty;
+    string ITag.Description => Description.FirstOrDefault() is { } d ? string.Concat(d.Text ?? []) : string.Empty;
     string? ITag.Value => Data.FirstOrDefault(d => d.Format == "Decorated")
         ?.DataValue.FirstOrDefault()?.Value;
+    IEnumerable<L5X.Base.ITagMember> ITag.Children =>
+        Data.FirstOrDefault(d => d.Format == "Decorated")
+            ?.Structure.SelectMany(BuildMembers) ?? [];
+
+    private static IEnumerable<L5X.Base.ITagMember> BuildMembers(DataStructure s) =>
+        s.DataValueMember.Select(m => (L5X.Base.ITagMember)new L5X.Base.TagMember
+            { Name = m.Name, DataType = m.DataType, Value = m.Value })
+        .Concat(s.StructureMember.Select(sm => new L5X.Base.TagMember
+            { Name = sm.Name, DataType = sm.DataType, Children = BuildMembers(sm).ToList() }));
 }
 
 public partial class RoutineType : IRoutine
@@ -110,16 +119,72 @@ public partial class FbdContentType : IFbdContent
 
 public partial class SheetType : IFbdSheet
 {
-    IEnumerable<IFbdBlock> IFbdSheet.Blocks => Block;
+    ulong IFbdSheet.Number => Number;
+    string? IFbdSheet.Description => Description.FirstOrDefault() is { } d ? string.Concat(d.Text ?? []) : string.Empty;
+    IEnumerable<IFbdElement> IFbdSheet.Blocks => Block ?? [];
+    IEnumerable<IFbdElement> IFbdSheet.IRefs => IRef ?? [];
+    IEnumerable<IFbdElement> IFbdSheet.ORefs => ORef ?? [];
+    IEnumerable<IFbdElement> IFbdSheet.ICons => ICon ?? [];
+    IEnumerable<IFbdElement> IFbdSheet.OCons => OCon ?? [];
+    IEnumerable<IFbdWire> IFbdSheet.Wires => Wire ?? [];
 }
 
-public partial class FbdBlockType : IFbdBlock
+public partial class FbdElementType : IFbdElement
 {
-    string? IFbdBlock.Type    => Type;
-    ulong  IFbdBlock.Id       => Id;
-    ulong  IFbdBlock.X        => X;
-    ulong  IFbdBlock.Y        => Y;
-    string? IFbdBlock.Operand => Operand;
+    string? IFbdElement.Type    => Type;
+    ulong  IFbdElement.Id       => Id;
+    ulong  IFbdElement.X        => X;
+    ulong  IFbdElement.Y        => Y;
+    string? IFbdElement.Operand => Operand;
+    string? IFbdElement.Pins    => VisiblePins ?? "";
+}
+
+public partial class FbdIRefType : IFbdElement
+{
+    string? IFbdElement.Type    => "IREF";
+    ulong  IFbdElement.Id       => Id;
+    ulong  IFbdElement.X        => X;
+    ulong  IFbdElement.Y        => Y;
+    string? IFbdElement.Operand => Operand;
+    string? IFbdElement.Pins    => "";
+}
+
+public partial class FbdORefType : IFbdElement
+{
+    string? IFbdElement.Type    => "OREF";
+    ulong  IFbdElement.Id       => Id;
+    ulong  IFbdElement.X        => X;
+    ulong  IFbdElement.Y        => Y;
+    string? IFbdElement.Operand => Operand;
+    string? IFbdElement.Pins    => "";
+}
+
+public partial class FbdIConType : IFbdElement
+{
+    string? IFbdElement.Type    => "ICON";
+    ulong  IFbdElement.Id       => Id;
+    ulong  IFbdElement.X        => X;
+    ulong  IFbdElement.Y        => Y;
+    string? IFbdElement.Operand => null;
+    string? IFbdElement.Pins    => "";
+}
+
+public partial class FbdOConType : IFbdElement
+{
+    string? IFbdElement.Type    => "ICON";
+    ulong  IFbdElement.Id       => Id;
+    ulong  IFbdElement.X        => X;
+    ulong  IFbdElement.Y        => Y;
+    string? IFbdElement.Operand => null;
+    string? IFbdElement.Pins    => "";
+}
+
+public partial class FbdWireType : IFbdWire
+{
+    ulong IFbdWire.FromId => FromId;
+    string IFbdWire.FromParam => FromParam;
+    ulong IFbdWire.ToId => ToId;
+    string IFbdWire.ToParam => ToParam;
 }
 
 // Sequence Flow Chart

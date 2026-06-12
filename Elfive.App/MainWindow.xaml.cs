@@ -2,7 +2,10 @@
 using System.Windows;
 using Elfive.App.Views;
 using L5X;
+using L5X.Base;
 using Microsoft.Win32;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Elfive.App;
 
@@ -14,6 +17,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = _viewModel;
+        Title = "Elfive Logic Viewer";
         Loaded += OnLoaded;
     }
 
@@ -22,15 +26,8 @@ public partial class MainWindow : Window
         
         var args = Environment.GetCommandLineArgs();
         var path = args.Length > 1 ? args[1] : null;
-        if (path is null) { Console.WriteLine("Path not Specified"); return; }
-        if (!File.Exists(path)) { Console.WriteLine($"File not found at {path}"); return; }
         
-        foreach (var name in typeof(TextViewer).Assembly.GetManifestResourceNames())
-            System.Diagnostics.Debug.WriteLine($"Resource: {name}");
-
-        var content = new L5XReader().Read(path);
-        if (content?.Controller is { } controller)
-            _viewModel.LoadController(controller);
+        LoadProject(path ?? "");
     }
 
     private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -49,11 +46,61 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() != true) return;
         
         var path = dialog.FileName;
+        LoadProject(path);
+       
+    }
+
+    private void LoadProject(string path)
+    {
         if (!File.Exists(path)) { Console.WriteLine($"File not found at {path}"); return; }
         var content = new L5XReader().Read(path);
-        Title = $"{Path.GetFileName(path)} - Elfive.Core";
+        Title = $"{Path.GetFileName(path)} - Elfive Logic Viewer";
+        
+        //PrintContent(content?.Controller, true);
+        
         if (content?.Controller is { } controller)
             _viewModel.LoadController(controller);
     }
+
+    public class InterfaceOnlyContractResolver :
+        DefaultContractResolver
+    {
+        private readonly IReadOnlyList<Type> _interfaces;
+
+        public InterfaceOnlyContractResolver(params Type[]
+            interfaces) => _interfaces = interfaces;
+
+        protected override IList<JsonProperty>
+            CreateProperties(Type type, MemberSerialization
+                memberSerialization)
+        {
+            var match = _interfaces.FirstOrDefault(i =>
+                i.IsAssignableFrom(type));
+            return base.CreateProperties(match ?? type,
+                memberSerialization);
+        }
+    }
+
+    private static void PrintContent(IController? controller, bool fullProject)
+    {
+        if (controller is null) return;
+        var settings = fullProject
+            ? new JsonSerializerSettings { Formatting = Formatting.Indented }
+            : new JsonSerializerSettings
+            {
+                ContractResolver = new InterfaceOnlyContractResolver(
+                    typeof(IL5XContent), typeof(IController), typeof(IProgram),
+                    typeof(IRoutine), typeof(IRllContent), typeof(IRung),
+                    typeof(IStContent), typeof(IStLine), typeof(IFbdContent),
+                    typeof(IFbdSheet), typeof(IFbdElement), typeof(ISfcContent),
+                    typeof(ISfcStep), typeof(ISfcTransition),
+                    typeof(ITag), typeof(ITask), typeof(IModule), typeof(IPort)
+                ),
+                Formatting = Formatting.Indented
+            };
+        var json = JsonConvert.SerializeObject(controller, settings);
+        File.WriteAllText(@"C:\users\dglan\desktop\controller.json", json);
+    }
+
     
 }
