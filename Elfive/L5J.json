@@ -1,0 +1,40 @@
+{
+  "?xml": {
+    "@version": "1.0",
+    "@encoding": "UTF-8",
+    "@standalone": "yes"
+  },
+  "RSLogix5000ImportData": {
+    "@SchemaRevision": "1.2",
+    "@TargetType": "Controller",
+    "@TargetName": "MainController",
+    "@ExportDate": "2026-06-11T12:00:00.000",
+    "Controller": {
+      "@Use": "Context",
+      "@Name": "MainController",
+      "Programs": {
+        "Program": {
+          "@Use": "Context",
+          "@Name": "MainProgram",
+          "@TestEdits": "false",
+          "@MainRoutineName": "MainRoutine",
+          "@Disabled": "false",
+          "Routines": {
+            "Routine": {
+              "@Use": "Context",
+              "@Name": "MainRoutine",
+              "@Type": "RLL",
+              "Rung": {
+                "@Number": "0",
+                "@Type": "N",
+                "Text": {
+                  "#cdata-section": "XIC(Local:1:I.Data.0) OTE(Local:1:O.Data.0);"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

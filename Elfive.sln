@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Elfive", "Elfive\Elfive.csproj", "{E5A9E4E9-1D4F-4A4E-8B08-91DEA8156C06}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Elfive.App", "Elfive.App\Elfive.App.csproj", "{5A140CDF-75C3-4F5F-A8A9-58ABCBABECBF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E5A9E4E9-1D4F-4A4E-8B08-91DEA8156C06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E5A9E4E9-1D4F-4A4E-8B08-91DEA8156C06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E5A9E4E9-1D4F-4A4E-8B08-91DEA8156C06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E5A9E4E9-1D4F-4A4E-8B08-91DEA8156C06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5A140CDF-75C3-4F5F-A8A9-58ABCBABECBF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5A140CDF-75C3-4F5F-A8A9-58ABCBABECBF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5A140CDF-75C3-4F5F-A8A9-58ABCBABECBF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5A140CDF-75C3-4F5F-A8A9-58ABCBABECBF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
