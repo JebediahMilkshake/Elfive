@@ -1,0 +1,122 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<SyntaxDefinition name="StructuredText" extensions=".st"
+    xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+    <Color name="Comment"    foreground="#6A9955" fontStyle="italic"/>
+    <Color name="Keyword"    foreground="#569CD6" fontWeight="bold"/>
+    <Color name="Operator"   foreground="#C586C0"/>
+    <Color name="Type"       foreground="#4EC9B0"/>
+    <Color name="Number"     foreground="#B5CEA8"/>
+    <Color name="String"     foreground="#CE9178"/>
+    <Color name="Constant"   foreground="#569CD6"/>
+    <Color name="Tag"        foreground="#DCDCAA"/>
+    <Color name="Instruction" foreground="#DCDCAA"/>
+
+    <RuleSet ignoreCase="true">
+        <!-- Line comments -->
+        <Span color="Comment">
+            <Begin>//</Begin>
+        </Span>
+
+        <!-- Block comments -->
+        <Span color="Comment" multiline="true">
+            <Begin>\(\*</Begin>
+            <End>\*\)</End>
+        </Span>
+
+        <!-- Strings -->
+        <Span color="String">
+            <Begin>'</Begin>
+            <End>'</End>
+        </Span>
+
+        <!-- Control flow keywords -->
+        <Keywords color="Keyword">
+            <Word>IF</Word>
+            <Word>THEN</Word>
+            <Word>ELSE</Word>
+            <Word>ELSIF</Word>
+            <Word>END_IF</Word>
+            <Word>FOR</Word>
+            <Word>TO</Word>
+            <Word>BY</Word>
+            <Word>DO</Word>
+            <Word>END_FOR</Word>
+            <Word>WHILE</Word>
+            <Word>END_WHILE</Word>
+            <Word>REPEAT</Word>
+            <Word>UNTIL</Word>
+            <Word>END_REPEAT</Word>
+            <Word>CASE</Word>
+            <Word>OF</Word>
+            <Word>END_CASE</Word>
+            <Word>RETURN</Word>
+            <Word>EXIT</Word>
+        </Keywords>
+
+        <!-- Boolean / logical operators -->
+        <Keywords color="Operator">
+            <Word>AND</Word>
+            <Word>OR</Word>
+            <Word>XOR</Word>
+            <Word>NOT</Word>
+            <Word>MOD</Word>
+        </Keywords>
+
+        <!-- Data types -->
+        <Keywords color="Type">
+            <Word>BOOL</Word>
+            <Word>SINT</Word>
+            <Word>INT</Word>
+            <Word>DINT</Word>
+            <Word>LINT</Word>
+            <Word>REAL</Word>
+            <Word>LREAL</Word>
+            <Word>STRING</Word>
+            <Word>TIMER</Word>
+            <Word>COUNTER</Word>
+        </Keywords>
+
+        <!-- Constants -->
+        <Keywords color="Constant">
+            <Word>TRUE</Word>
+            <Word>FALSE</Word>
+        </Keywords>
+
+        <!-- Common instructions/functions -->
+        <Keywords color="Instruction">
+            <Word>ABS</Word>
+            <Word>SQRT</Word>
+            <Word>TRUNC</Word>
+            <Word>MOV</Word>
+            <Word>COP</Word>
+            <Word>SIZE</Word>
+            <Word>TON</Word>
+            <Word>TOF</Word>
+            <Word>RTO</Word>
+            <Word>CTU</Word>
+            <Word>CTD</Word>
+            <Word>ADD</Word>
+            <Word>SUB</Word>
+            <Word>MUL</Word>
+            <Word>DIV</Word>
+            <Word>NEG</Word>
+            <Word>GRT</Word>
+            <Word>GEQ</Word>
+            <Word>EQU</Word>
+            <Word>LEQ</Word>
+            <Word>LES</Word>
+            <Word>NEQ</Word>
+        </Keywords>
+
+        <!-- Numbers (integer and float) -->
+        <Rule color="Number">
+            \b[0-9]+\.?[0-9]*\b
+        </Rule>
+
+        <!-- Assignment operator -->
+        <Rule color="Operator">
+            :=
+        </Rule>
+    </RuleSet>
+</SyntaxDefinition>

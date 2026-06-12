@@ -12,8 +12,9 @@ public interface IController
     string? Name { get; }
     string? ProcessorType { get; }
     IEnumerable<IProgram> Programs { get; }
-    IEnumerable<IModule> Modules { get; }
-    IEnumerable<ITag> Tags { get; }
+    IEnumerable<IModule>  Modules  { get; }
+    IEnumerable<ITag>     Tags     { get; }
+    IEnumerable<ITask>    Tasks    { get; }
 }
 
 public interface IProgram
@@ -42,6 +43,7 @@ public interface IRllContent : IRoutineContent
 public interface IRung
 {
     ulong Number { get; }
+    string? Comment { get; }
     string? Text { get; }
 }
 
@@ -103,18 +105,41 @@ public interface ISfcTransition
     string? Operand { get; }
 }
 
+public interface IPort
+{
+    ushort  Id       { get; }
+    string? Type     { get; }
+    string? Address  { get; }
+    bool    Upstream { get; }
+}
+
 public interface IModule
 {
-    string? Name { get; }
-    string? CatalogNumber { get; }
-    string? Status { get; }
-    string? ParentModule { get; }
+    string?                   Name            { get; }
+    ushort?                   Slot { get; }
+    string?                   CatalogNumber   { get; }
+    string?                   Status          { get; }
+    string?                   ParentModule    { get; }
+    ushort                    ParentModPortId { get; }
+    string?                   IpAddress       { get; }
+    IEnumerable<IPort>? Ports   { get; }
 }
 
 public interface ITag
 {
-    string? Name { get; }
+    string? Name        { get; }
     string? Description { get; }
-    string? DataType { get; }
-    string? Value { get; }
+    string? DataType    { get; }
+    string? Value       { get; }
+}
+
+public enum TaskScanType { Continuous, Periodic, Event }
+
+public interface ITask
+{
+    string?             Name        { get; }
+    string?             Description { get; }
+    TaskScanType        ScanType    { get; }
+    float?              ScanRate    { get; }
+    IEnumerable<string> Children    { get; }
 }

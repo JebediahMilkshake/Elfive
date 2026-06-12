@@ -9,4 +9,8 @@ public class TreeNode
     public string Detail { get; set; } = "";   // e.g. routine type "RLL", "ST"
     public object? Source { get; set; }         // reference back to your parsed object
     public ObservableCollection<TreeNode> Children { get; set; } = [];
+
+    public TreeNode()
+    {
+    }
 }

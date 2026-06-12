@@ -1,6 +1,6 @@
 ﻿using System.IO;
 using System.Windows;
-using System.Windows.Controls;
+using Elfive.App.Views;
 using L5X;
 using Microsoft.Win32;
 
@@ -19,10 +19,14 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        
         var args = Environment.GetCommandLineArgs();
         var path = args.Length > 1 ? args[1] : null;
         if (path is null) { Console.WriteLine("Path not Specified"); return; }
         if (!File.Exists(path)) { Console.WriteLine($"File not found at {path}"); return; }
+        
+        foreach (var name in typeof(TextViewer).Assembly.GetManifestResourceNames())
+            System.Diagnostics.Debug.WriteLine($"Resource: {name}");
 
         var content = new L5XReader().Read(path);
         if (content?.Controller is { } controller)
@@ -47,7 +51,7 @@ public partial class MainWindow : Window
         var path = dialog.FileName;
         if (!File.Exists(path)) { Console.WriteLine($"File not found at {path}"); return; }
         var content = new L5XReader().Read(path);
-        Title = $"{Path.GetFileName(path)} - Elfive";
+        Title = $"{Path.GetFileName(path)} - Elfive.Core";
         if (content?.Controller is { } controller)
             _viewModel.LoadController(controller);
     }

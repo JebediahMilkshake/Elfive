@@ -9,11 +9,19 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
       <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Elfive\Elfive.csproj" />
+      <ProjectReference Include="..\Elfive.Core\Elfive.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Syntax\StructuredText.xshd" />
+      <Content Include="Syntax\StructuredText.xshd">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
 </Project>

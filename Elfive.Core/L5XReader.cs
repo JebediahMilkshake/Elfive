@@ -2,6 +2,8 @@ using System.IO;
 using System.Xml;
 using System.Xml.Serialization;
 using L5X.Base;
+using Newtonsoft.Json;
+using Formatting = Newtonsoft.Json.Formatting;
 
 namespace L5X;
 

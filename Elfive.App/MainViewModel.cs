@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Text;
 using System.Windows.Data;
@@ -42,10 +41,18 @@ public partial class MainViewModel : ObservableObject
         
         TreeItems.Add(BuildTagList(controller));
         TreeItems.Add(BuildPrograms(controller));
-        if (controller != null) TreeItems.Add(BuildIO(controller));
+        if (controller != null) TreeItems.Add(BuildIoConfig(controller));
 
 
         TagCount = _allTags.Count;
+    }
+
+    public static IEnumerable<(string text, string? comment, ulong number)> GetRungText(TreeNode node)
+    {
+        if (node.Source is not IRoutine { Content: IRllContent rll })
+            yield break;
+        foreach (var rung in rll.Rungs)
+            yield return (rung.Text, rung.Comment, rung.Number)!;
     }
 
     private TreeNode BuildTagList(IController? controller)
@@ -117,38 +124,84 @@ public partial class MainViewModel : ObservableObject
         
     }
     
-    private static TreeNode BuildIO(IController controller)
+    private static TreeNode BuildIoConfig(IController controller)
     {
-        var ioNode = new TreeNode { Name = "I/O Tree", NodeType = "Folder" };
         var nodeMap = new Dictionary<string, TreeNode>();
+        var root = new TreeNode { Name = "I/O Configuration", NodeType = "Folder" };
+        nodeMap["root"] = root;
 
+        //Build out modules into map
         foreach (var module in controller.Modules)
         {
+            var modNameString = (module.Slot is {} ? $"[{module.Slot}] " : "") + $"{module.CatalogNumber} : ";
+            modNameString += module.Name == "Local" ? controller.Name : module.Name;
+            
             var node = new TreeNode
             {
-                Name = $"{module.CatalogNumber} : {module.Name}",
+                Name = modNameString,
                 NodeType = "Module",
                 Source = module,
             };
             if (module.Name != null)
                 nodeMap[module.Name] = node;
+            
+            //Add this module's ports
+            var modPorts = module.Ports?.ToList();
+            if (modPorts is not { Count: > 0 }) continue;
+            
+            for (var index = 0; index < modPorts.Count; index++)
+            {
+                var port = modPorts[index];
+                if (port.Upstream) continue;
+
+                string portName = "[null]";
+                if (port.Type == "Ethernet")
+                {
+                    if (module.Name == "Local") 
+                        portName = modPorts.Count > 1 ? $"A{index}, Ethernet" : "Ethernet";
+                }
+                else
+                {
+                    portName = $"{port.Type} Backplane";
+                }
+
+                var portNode = new TreeNode
+                {
+                    Name = portName,
+                    NodeType = "Folder",
+                    Source = port
+                };
+
+                if (module.Name == "Local")
+                    root.Children.Add(portNode);
+                else
+                {
+                    node.Children.Add(portNode);
+                }
+                nodeMap[$"{module.Name}_Port{port.Id}"] = portNode;
+                portNode.Children.Add(node);
+                
+                    
+                
+            }
         }
 
+        //Map modules to their parents
         foreach (var module in controller.Modules)
         {
-            if (module.Name == null) continue;
+            if (module.Name is null or "Local") continue;
             var node = nodeMap[module.Name];
-            var isRoot = module.ParentModule == null
-                      || module.ParentModule == module.Name
-                      || !nodeMap.ContainsKey(module.ParentModule);
-
-            if (isRoot)
-                ioNode.Children.Add(node);
-            else
-                nodeMap[module.ParentModule!].Children.Add(node);
+            
+            if (nodeMap.TryGetValue($"{module.ParentModule!}_Port{module.ParentModPortId}", out var port))
+                if (!port.Children.Contains(node)) port.Children.Add(node);
+            else if (nodeMap.TryGetValue(module.ParentModule!, out var parent))
+            {
+                if (!parent.Children.Contains(node)) 
+                    parent.Children.Add(node);
+            }
         }
 
-        return ioNode;
+        return root;
     }
 
     private void SetupTagFiltering()
@@ -167,7 +220,6 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnTagFilterChanged(string value)
     {
-        System.Diagnostics.Debug.WriteLine($"Filter changed: '{value}'");
         VisibleTags?.Refresh();
     }
 
@@ -193,12 +245,12 @@ public partial class MainViewModel : ObservableObject
 
     private void LoadTags(IEnumerable<ITag>? tags)
     {
-        SelectedTags.Clear();
+        _allTags.Clear();
         if (tags is null) return;
 
         foreach (var tag in tags)
         {
-            SelectedTags.Add(new TagViewModel
+            _allTags.Add(new TagViewModel
             {
                 Name = tag.Name ?? "",
                 Value = tag.Value ?? "",
@@ -206,6 +258,7 @@ public partial class MainViewModel : ObservableObject
                 Description = tag.Description ?? "",
             });
         }
+        VisibleTags?.Refresh();
     }
 
     private void LoadRoutineContent(IRoutine? routine)

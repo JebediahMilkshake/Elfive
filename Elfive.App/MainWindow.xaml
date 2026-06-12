@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Elfive.App"
+        xmlns:views="clr-namespace:Elfive.App.Views"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800"
         WindowState="Maximized">
@@ -68,7 +69,7 @@
                     <DataTemplate x:Key="TagsTemplate">
                         <DockPanel>
                             <TextBox DockPanel.Dock="Top"
-                                     Text="{Binding TagFilter, 
+                                     Text="{Binding DataContext.TagFilter, 
                                         RelativeSource={RelativeSource AncestorType=Window},
                                         UpdateSourceTrigger=PropertyChanged}"
                                      Margin="4" Padding="4" />
@@ -87,14 +88,15 @@
                     </DataTemplate>
 
                     <!-- When a Routine is selected: show its content -->
-                    <DataTemplate x:Key="RoutineTemplate">
-                        <TextBox
-                            Text="{Binding DataContext.SelectedRoutineContent,
-                             RelativeSource={RelativeSource AncestorType=Window}}"
-                            FontFamily="Consolas" FontSize="13"
-                            IsReadOnly="True" AcceptsReturn="True"
-                            VerticalScrollBarVisibility="Auto"
-                            HorizontalScrollBarVisibility="Auto" />
+                    <DataTemplate x:Key="TextTemplate">
+                        <views:TextViewer
+                            RoutineContent="{Binding DataContext.SelectedRoutineContent,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                            RoutineType="{Binding Detail}"/>
+                    </DataTemplate>
+                    
+                    <DataTemplate x:Key="LadderTemplate">
+                        <views:LadderViewer/>
                     </DataTemplate>
 
                     <!-- When a Module is selected: show its details -->
@@ -110,7 +112,8 @@
                     <local:NodeTemplateSelector
                         EmptyTemplate="{StaticResource EmptyTemplate}"
                         TagsTemplate="{StaticResource TagsTemplate}"
-                        RoutineTemplate="{StaticResource RoutineTemplate}"
+                        TextTemplate="{StaticResource TextTemplate}"
+                        LadderTemplate="{StaticResource LadderTemplate}"
                         ModuleTemplate="{StaticResource ModuleTemplate}" />
                 </ContentControl.ContentTemplateSelector>
             </ContentControl>
