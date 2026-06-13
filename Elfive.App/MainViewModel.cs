@@ -181,9 +181,9 @@ public partial class MainViewModel : ObservableObject
                 var taskNode = new TreeNode<ITask>()
                 {
                     Name = task.Name,
-                    NodeType = "Folder",
+                    NodeType = "Task",
                     Source = task,
-                    Detail = task.Description ?? ""
+                    Detail = BuildTaskDetail(task).ToArray()
                 };
                 tasks.Children.Add(taskNode);
                 nodeMap[task.Name!] =  taskNode;
@@ -202,6 +202,7 @@ public partial class MainViewModel : ObservableObject
                 {
                     Name = program.Name,
                     NodeType = "Program",
+                    Detail = [],
                     Source = program,
                 };
 
@@ -212,7 +213,7 @@ public partial class MainViewModel : ObservableObject
                         Name = routine.Name,
                         NodeType = "Routine",
                         Source = routine,
-                        Detail = routine.Type,
+                        Detail = [("",routine.Type)],
                         Parent = programNode
                     };
 
@@ -348,6 +349,24 @@ public partial class MainViewModel : ObservableObject
                    || tag.Description.Contains(TagFilter, StringComparison.OrdinalIgnoreCase);
         };
         OnPropertyChanged(nameof(VisibleTags));
+    }
+
+    private static IEnumerable<(string name, string value)> BuildTaskDetail(ITask task)
+    {
+        List<(string name, string value)> results =
+        [
+            ("Type", task.ScanType.ToString()),
+            ("Description", string.IsNullOrEmpty(task.Description) ? "No Description" : task.Description)
+        ];
+
+        if (task.ScanType == TaskScanType.Continuous) return results;
+
+        results.Add(task.ScanType == TaskScanType.Periodic
+            ? ("Period", $"{task.ScanRate:N0}")
+            : ("Trigger", task.Trigger!));
+
+        results.Add(("Priority", $"{task.Priority:N0}"));
+        return results;
     }
 
     partial void OnTagFilterChanged(string value)

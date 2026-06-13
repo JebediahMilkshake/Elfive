@@ -23,7 +23,8 @@ public class NodeTemplateSelector : DataTemplateSelector
             "Tags" or "Program" => TagsTemplate,
             "Routine" => (item is TreeNode<IRoutine> routine) ? GetRoutineTemplate(routine) : null,
             "FbdSheet" => FdbTemplate,
-            "Module" => ModuleTemplate,
+            "Module" or "Task" => ModuleTemplate,
+            
             _ => EmptyTemplate
         };
     }

@@ -224,5 +224,6 @@ public partial class TaskType : ITask
         _                       => TaskScanType.Continuous,
     };
     float?              ITask.ScanRate    => RateSpecified ? (float)Rate : null;
+    string? ITask.Trigger => EventInfo.EventTrigger.ToString();
     IEnumerable<string> ITask.Children    => ScheduledPrograms.Select(sp => sp.Name);
 }

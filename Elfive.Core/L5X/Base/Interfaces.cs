@@ -174,5 +174,8 @@ public interface ITask
     string?             Description { get; }
     TaskScanType        ScanType    { get; }
     float?              ScanRate    { get; }
+    string? Trigger { get; }
+    ushort Priority { get; }
     IEnumerable<string> Children    { get; }
+   
 }
