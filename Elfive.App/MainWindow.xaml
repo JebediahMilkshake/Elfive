@@ -38,7 +38,8 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left sidebar: project tree -->
-            <TreeView Grid.Column="0"
+            <TreeView x:Name="ProjectTree"
+                      Grid.Column="0"
                       ItemsSource="{Binding TreeItems}"
                       SelectedItemChanged="TreeView_SelectedItemChanged">
                 <TreeView.ItemTemplate>
@@ -56,229 +57,251 @@
                           HorizontalAlignment="Stretch"
                           Background="LightGray" />
 
-            <!-- Right content area -->
-            <ContentControl Grid.Column="2" Content="{Binding SelectedNode}">
-                <ContentControl.Resources>
+            <!-- Right panel with tab bar -->
+            <TabControl Grid.Column="2"
+                        SelectedIndex="{Binding ActiveTab}"
+                        Padding="0"
+                        BorderThickness="0,1,0,0">
+                <TabItem Header="Controller">
+                    <ContentControl Content="{Binding SelectedNode}">
+                        <ContentControl.Resources>
 
-                    <!-- When nothing is selected -->
-                    <DataTemplate x:Key="EmptyTemplate">
-                        <TextBlock Text="Select an item from the tree"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="Gray" FontSize="16" />
-                    </DataTemplate>
+                            <!-- When nothing is selected -->
+                            <DataTemplate x:Key="EmptyTemplate">
+                                <TextBlock Text="Select an item from the tree"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="Gray" FontSize="16" />
+                            </DataTemplate>
 
-                    <!-- When a Program is selected or controller tags: -->
-                    <DataTemplate x:Key="TagsTemplate">
-                        <DockPanel>
-                            <Grid DockPanel.Dock="Top" Margin="4">
-                                <TextBox x:Name="TagFilterBox"
-                                         Text="{Binding DataContext.TagFilter,
-                                            RelativeSource={RelativeSource AncestorType=Window},
-                                            UpdateSourceTrigger=PropertyChanged}"
-                                         Padding="4" />
-                                <TextBlock Text="Filter Tags..."
-                                           Foreground="DarkGray"
-                                           Margin="6,5"
-                                           IsHitTestVisible="False"
-                                           VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding DataContext.TagFilter, RelativeSource={RelativeSource AncestorType=Window}}" Value=""/>
-                                                        <Condition Binding="{Binding IsFocused, ElementName=TagFilterBox}" Value="False"/>
-                                                    </MultiDataTrigger.Conditions>
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </MultiDataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                            <!-- Column headers: 16px expander spacer + name text, then aligned columns -->
-                            <Border DockPanel.Dock="Top"
-                                    Background="{x:Static SystemColors.ControlBrush}"
-                                    BorderBrush="{x:Static SystemColors.ControlDarkBrush}"
-                                    BorderThickness="0,1,0,1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="200"/>
-                                        <ColumnDefinition Width="1"/>
-                                        <ColumnDefinition Width="150"/>
-                                        <ColumnDefinition Width="1"/>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="1"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <!-- 20px = 16px expander area + 4px text padding, to align with row name text -->
-                                    <TextBlock Grid.Column="0" Text="Name"        FontWeight="SemiBold" Padding="20,3,4,3"/>
-                                    <Rectangle Grid.Column="1" Fill="{x:Static SystemColors.ControlDarkBrush}"/>
-                                    <TextBlock Grid.Column="2" Text="Value"       FontWeight="SemiBold" Padding="4,3"/>
-                                    <Rectangle Grid.Column="3" Fill="{x:Static SystemColors.ControlDarkBrush}"/>
-                                    <TextBlock Grid.Column="4" Text="Data Type"   FontWeight="SemiBold" Padding="4,3"/>
-                                    <Rectangle Grid.Column="5" Fill="{x:Static SystemColors.ControlDarkBrush}"/>
-                                    <TextBlock Grid.Column="6" Text="Description" FontWeight="SemiBold" Padding="4,3"/>
-                                </Grid>
-                            </Border>
-                            <TreeView ItemsSource="{Binding DataContext.VisibleTags,
-                                          RelativeSource={RelativeSource AncestorType=Window}}"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                                <!-- Re-templated TreeViewItem: removes per-level indent from children.
-                                     The expander arrow is embedded in the Name column instead. -->
-                                <TreeView.ItemContainerStyle>
-                                    <Style TargetType="TreeViewItem">
-                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                        <Setter Property="IsExpanded" Value="False"/>
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="TreeViewItem">
-                                                    <StackPanel>
-                                                        <Border x:Name="Bd" Background="Transparent">
-                                                            <ContentPresenter x:Name="PART_Header"
-                                                                              ContentSource="Header"
-                                                                              HorizontalAlignment="Stretch"/>
-                                                        </Border>
-                                                        <ItemsPresenter x:Name="ItemsHost" Margin="0"/>
-                                                    </StackPanel>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsExpanded" Value="False">
-                                                            <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
-                                                        </Trigger>
-                                                        <Trigger Property="IsSelected" Value="True">
-                                                            <Setter TargetName="Bd" Property="Background"
-                                                                    Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
-                                                        </Trigger>
-                                                        <MultiTrigger>
-                                                            <MultiTrigger.Conditions>
-                                                                <Condition Property="IsSelected" Value="True"/>
-                                                                <Condition Property="IsSelectionActive" Value="False"/>
-                                                            </MultiTrigger.Conditions>
-                                                            <Setter TargetName="Bd" Property="Background"
-                                                                    Value="{DynamicResource {x:Static SystemColors.InactiveSelectionHighlightBrushKey}}"/>
-                                                        </MultiTrigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </TreeView.ItemContainerStyle>
-                                <TreeView.Resources>
-                                    <HierarchicalDataTemplate DataType="{x:Type local:TagViewModel}"
-                                                              ItemsSource="{Binding Children}">
-                                        <Border BorderBrush="{x:Static SystemColors.ControlDarkBrush}"
-                                                BorderThickness="0,0,0,1">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Background" Value="Transparent"/>
+                            <!-- When a Program is selected or controller tags: -->
+                            <DataTemplate x:Key="TagsTemplate">
+                                <DockPanel>
+                                    <Grid DockPanel.Dock="Top" Margin="4">
+                                        <TextBox x:Name="TagFilterBox"
+                                                 Text="{Binding DataContext.TagFilter,
+                                                    RelativeSource={RelativeSource AncestorType=Window},
+                                                    UpdateSourceTrigger=PropertyChanged}"
+                                                 Padding="4" />
+                                        <TextBlock Text="Filter Tags..."
+                                                   Foreground="DarkGray"
+                                                   Margin="6,5"
+                                                   IsHitTestVisible="False"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Value}" Value="{}{...}">
-                                                            <Setter Property="Background" Value="#F4F4F4"/>
-                                                        </DataTrigger>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding DataContext.TagFilter, RelativeSource={RelativeSource AncestorType=Window}}" Value=""/>
+                                                                <Condition Binding="{Binding IsFocused, ElementName=TagFilterBox}" Value="False"/>
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </MultiDataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
-                                            </Border.Style>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="200"/>
-                                                    <ColumnDefinition Width="1"/>
-                                                    <ColumnDefinition Width="150"/>
-                                                    <ColumnDefinition Width="1"/>
-                                                    <ColumnDefinition Width="120"/>
-                                                    <ColumnDefinition Width="1"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <!-- Name column: fixed 16px expander + depth-indented name text -->
-                                                <Grid Grid.Column="0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="16"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <ToggleButton Grid.Column="0"
-                                                                  Focusable="False"
-                                                                  Background="Transparent"
-                                                                  BorderThickness="0"
-                                                                  IsChecked="{Binding IsExpanded,
-                                                                      RelativeSource={RelativeSource AncestorType=TreeViewItem},
-                                                                      Mode=TwoWay}"
-                                                                  Visibility="{Binding HasItems,
-                                                                      RelativeSource={RelativeSource AncestorType=TreeViewItem},
-                                                                      Converter={StaticResource BoolToVis}}">
-                                                        <Path HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                            <Path.Style>
-                                                                <Style TargetType="Path">
-                                                                    <Setter Property="Fill" Value="{x:Static SystemColors.ControlDarkBrush}"/>
-                                                                    <Setter Property="Data" Value="M 0 0 L 5 4 L 0 8 Z"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsExpanded,
-                                                                            RelativeSource={RelativeSource AncestorType=TreeViewItem}}"
-                                                                            Value="True">
-                                                                            <Setter Property="Data" Value="M 0 0 L 8 0 L 4 5 Z"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Path.Style>
-                                                        </Path>
-                                                    </ToggleButton>
-                                                    <TextBlock Grid.Column="1"
-                                                               Text="{Binding Name}"
-                                                               Margin="{Binding DepthMargin}"
-                                                               Padding="4,2"
-                                                               TextTrimming="CharacterEllipsis"/>
-                                                </Grid>
-                                                <Rectangle Grid.Column="1" Fill="{x:Static SystemColors.ControlLightBrush}" VerticalAlignment="Stretch"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding Value}"       Padding="4,2"/>
-                                                <Rectangle Grid.Column="3" Fill="{x:Static SystemColors.ControlLightBrush}" VerticalAlignment="Stretch"/>
-                                                <TextBlock Grid.Column="4" Text="{Binding DataType}"    Padding="4,2"/>
-                                                <Rectangle Grid.Column="5" Fill="{x:Static SystemColors.ControlLightBrush}" VerticalAlignment="Stretch"/>
-                                                <TextBlock Grid.Column="6" Text="{Binding Description}" Padding="4,2"/>
-                                            </Grid>
-                                        </Border>
-                                    </HierarchicalDataTemplate>
-                                </TreeView.Resources>
-                            </TreeView>
-                        </DockPanel>
-                    </DataTemplate>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                    <!-- Column headers -->
+                                    <Border DockPanel.Dock="Top"
+                                            Background="{x:Static SystemColors.ControlBrush}"
+                                            BorderBrush="{x:Static SystemColors.ControlDarkBrush}"
+                                            BorderThickness="0,1,0,1">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="200"/>
+                                                <ColumnDefinition Width="1"/>
+                                                <ColumnDefinition Width="150"/>
+                                                <ColumnDefinition Width="1"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="1"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Name"        FontWeight="SemiBold" Padding="20,3,4,3"/>
+                                            <Rectangle Grid.Column="1" Fill="{x:Static SystemColors.ControlDarkBrush}"/>
+                                            <TextBlock Grid.Column="2" Text="Value"       FontWeight="SemiBold" Padding="4,3"/>
+                                            <Rectangle Grid.Column="3" Fill="{x:Static SystemColors.ControlDarkBrush}"/>
+                                            <TextBlock Grid.Column="4" Text="Data Type"   FontWeight="SemiBold" Padding="4,3"/>
+                                            <Rectangle Grid.Column="5" Fill="{x:Static SystemColors.ControlDarkBrush}"/>
+                                            <TextBlock Grid.Column="6" Text="Description" FontWeight="SemiBold" Padding="4,3"/>
+                                        </Grid>
+                                    </Border>
+                                    <TreeView ItemsSource="{Binding DataContext.VisibleTags,
+                                                  RelativeSource={RelativeSource AncestorType=Window}}"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                        <TreeView.ItemContainerStyle>
+                                            <Style TargetType="TreeViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="IsExpanded" Value="False"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="TreeViewItem">
+                                                            <StackPanel>
+                                                                <Border x:Name="Bd" Background="Transparent">
+                                                                    <ContentPresenter x:Name="PART_Header"
+                                                                                      ContentSource="Header"
+                                                                                      HorizontalAlignment="Stretch"/>
+                                                                </Border>
+                                                                <ItemsPresenter x:Name="ItemsHost" Margin="0"/>
+                                                            </StackPanel>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsExpanded" Value="False">
+                                                                    <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsSelected" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background"
+                                                                            Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                                                </Trigger>
+                                                                <MultiTrigger>
+                                                                    <MultiTrigger.Conditions>
+                                                                        <Condition Property="IsSelected" Value="True"/>
+                                                                        <Condition Property="IsSelectionActive" Value="False"/>
+                                                                    </MultiTrigger.Conditions>
+                                                                    <Setter TargetName="Bd" Property="Background"
+                                                                            Value="{DynamicResource {x:Static SystemColors.InactiveSelectionHighlightBrushKey}}"/>
+                                                                </MultiTrigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </TreeView.ItemContainerStyle>
+                                        <TreeView.Resources>
+                                            <HierarchicalDataTemplate DataType="{x:Type local:TagViewModel}"
+                                                                      ItemsSource="{Binding Children}">
+                                                <Border BorderBrush="{x:Static SystemColors.ControlDarkBrush}"
+                                                        BorderThickness="0,0,0,1"
+                                                        Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="Transparent"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Value}" Value="{}{...}">
+                                                                    <Setter Property="Background" Value="#F4F4F4"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <Border.ContextMenu>
+                                                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                                            <MenuItem Header="Copy"
+                                                                      Command="{Binding CopyTagNameCommand}"
+                                                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                            <MenuItem Header="Cross Reference"
+                                                                      Command="{Binding OpenXRefCommand}"
+                                                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                        </ContextMenu>
+                                                    </Border.ContextMenu>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="200"/>
+                                                            <ColumnDefinition Width="1"/>
+                                                            <ColumnDefinition Width="150"/>
+                                                            <ColumnDefinition Width="1"/>
+                                                            <ColumnDefinition Width="120"/>
+                                                            <ColumnDefinition Width="1"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Grid Grid.Column="0">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="16"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <ToggleButton Grid.Column="0"
+                                                                          Focusable="False"
+                                                                          Background="Transparent"
+                                                                          BorderThickness="0"
+                                                                          IsChecked="{Binding IsExpanded,
+                                                                              RelativeSource={RelativeSource AncestorType=TreeViewItem},
+                                                                              Mode=TwoWay}"
+                                                                          Visibility="{Binding HasItems,
+                                                                              RelativeSource={RelativeSource AncestorType=TreeViewItem},
+                                                                              Converter={StaticResource BoolToVis}}">
+                                                                <Path HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <Path.Style>
+                                                                        <Style TargetType="Path">
+                                                                            <Setter Property="Fill" Value="{x:Static SystemColors.ControlDarkBrush}"/>
+                                                                            <Setter Property="Data" Value="M 0 0 L 5 4 L 0 8 Z"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsExpanded,
+                                                                                    RelativeSource={RelativeSource AncestorType=TreeViewItem}}"
+                                                                                    Value="True">
+                                                                                    <Setter Property="Data" Value="M 0 0 L 8 0 L 4 5 Z"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Path.Style>
+                                                                </Path>
+                                                            </ToggleButton>
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{Binding Name}"
+                                                                       Margin="{Binding DepthMargin}"
+                                                                       Padding="4,2"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                        </Grid>
+                                                        <Rectangle Grid.Column="1" Fill="{x:Static SystemColors.ControlLightBrush}" VerticalAlignment="Stretch"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Value}"       Padding="4,2"/>
+                                                        <Rectangle Grid.Column="3" Fill="{x:Static SystemColors.ControlLightBrush}" VerticalAlignment="Stretch"/>
+                                                        <TextBlock Grid.Column="4" Text="{Binding DataType}"    Padding="4,2"/>
+                                                        <Rectangle Grid.Column="5" Fill="{x:Static SystemColors.ControlLightBrush}" VerticalAlignment="Stretch"/>
+                                                        <TextBlock Grid.Column="6" Text="{Binding Description}" Padding="4,2"/>
+                                                    </Grid>
+                                                </Border>
+                                            </HierarchicalDataTemplate>
+                                        </TreeView.Resources>
+                                    </TreeView>
+                                </DockPanel>
+                            </DataTemplate>
 
-                    <!-- When a Routine is selected: show its content -->
-                    <DataTemplate x:Key="StTemplate">
-                        <views:STViewer
-                            RoutineContent="{Binding DataContext.SelectedRoutineContent,
-                                RelativeSource={RelativeSource AncestorType=Window}}"
-                            RoutineType="{Binding Detail}"
-                            RoutineHeader="{Binding DataContext.SelectedRoutineHeader,
-                                RelativeSource={RelativeSource AncestorType=Window}}"/>
-                    </DataTemplate>
-                    
-                    <DataTemplate x:Key="RllTemplate">
-                        <views:RLLView/>
-                    </DataTemplate>
-                    
-                    <DataTemplate x:Key="FbdTemplate">
-                        <views:FBDViewer/>
-                    </DataTemplate>
+                            <!-- When a Routine is selected: show its content -->
+                            <DataTemplate x:Key="StTemplate">
+                                <views:STViewer
+                                    RoutineContent="{Binding DataContext.SelectedRoutineContent,
+                                        RelativeSource={RelativeSource AncestorType=Window}}"
+                                    RoutineType="{Binding Detail}"
+                                    RoutineHeader="{Binding DataContext.SelectedRoutineHeader,
+                                        RelativeSource={RelativeSource AncestorType=Window}}"/>
+                            </DataTemplate>
 
-                    <!-- When a Module is selected: show its details -->
-                    <DataTemplate x:Key="ModuleTemplate">
-                        <StackPanel Margin="16">
-                            <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="Bold" />
-                            <TextBlock Text="{Binding Detail}" Foreground="Gray" Margin="0,4,0,0" />
-                        </StackPanel>
-                    </DataTemplate>
+                            <DataTemplate x:Key="RllTemplate">
+                                <views:RLLView/>
+                            </DataTemplate>
 
-                </ContentControl.Resources>
-                <ContentControl.ContentTemplateSelector>
-                    <local:NodeTemplateSelector
-                        EmptyTemplate="{StaticResource EmptyTemplate}"
-                        TagsTemplate="{StaticResource TagsTemplate}"
-                        StTemplate="{StaticResource StTemplate}"
-                        FdbTemplate="{StaticResource FbdTemplate}"
-                        RllTemplate="{StaticResource RllTemplate}"
-                        ModuleTemplate="{StaticResource ModuleTemplate}" />
-                </ContentControl.ContentTemplateSelector>
-            </ContentControl>
+                            <DataTemplate x:Key="FbdTemplate">
+                                <views:FBDViewer/>
+                            </DataTemplate>
+
+                            <DataTemplate x:Key="SfcTemplate">
+                                <views:SFCViewer/>
+                            </DataTemplate>
+
+                            <!-- When a Module is selected: show its details -->
+                            <DataTemplate x:Key="ModuleTemplate">
+                                <StackPanel Margin="16">
+                                    <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="Bold" />
+                                    <TextBlock Text="{Binding Detail}" Foreground="Gray" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </DataTemplate>
+
+                        </ContentControl.Resources>
+                        <ContentControl.ContentTemplateSelector>
+                            <local:NodeTemplateSelector
+                                EmptyTemplate="{StaticResource EmptyTemplate}"
+                                TagsTemplate="{StaticResource TagsTemplate}"
+                                StTemplate="{StaticResource StTemplate}"
+                                FdbTemplate="{StaticResource FbdTemplate}"
+                                RllTemplate="{StaticResource RllTemplate}"
+                                SfcTemplate="{StaticResource SfcTemplate}"
+                                ModuleTemplate="{StaticResource ModuleTemplate}" />
+                        </ContentControl.ContentTemplateSelector>
+                    </ContentControl>
+                </TabItem>
+                <TabItem Header="Cross Reference">
+                    <views:XRefView/>
+                </TabItem>
+            </TabControl>
         </Grid>
     </DockPanel>
 </Window>

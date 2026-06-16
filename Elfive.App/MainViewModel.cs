@@ -2,25 +2,32 @@
 using System.ComponentModel;
 using System.IO;
 using System.Text;
+using System.Windows;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
-using L5X.Base;
+using CommunityToolkit.Mvvm.Input;
+using Elfive.Core.L5X.Base;
+using Elfive.Core.RLL;
+using Elfive.Core.TAG;
 using Newtonsoft.Json;
 
 namespace Elfive.App;
 
 public partial class MainViewModel : ObservableObject
 {
-    
     public ObservableCollection<TreeNode> TreeItems { get; } = [];
     private readonly List<TagViewModel> _allTags = [];
     private readonly Dictionary<string, string> _controllerTagValues = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<IRoutine, TreeNode<IRoutine>> _routineNodeMap = new(ReferenceEqualityComparer.Instance);
+
     public IReadOnlyDictionary<string, string> ControllerTagValues => _controllerTagValues;
+    public RoutineDatabase? RoutineDb { get; private set; }
+    public TagDatabase? TagDb { get; private set; }
     public ICollectionView? VisibleTags { get; private set; }
 
     [ObservableProperty]
     private string _tagFilter = "";
-    [ObservableProperty] 
+    [ObservableProperty]
     private TreeNode? _selectedNode;
     [ObservableProperty]
     private ObservableCollection<TagViewModel> _selectedTags = [];
@@ -30,31 +37,56 @@ public partial class MainViewModel : ObservableObject
     private string _selectedRoutineHeader = "";
     [ObservableProperty]
     private string _controllerName = "";
-    [ObservableProperty] 
+    [ObservableProperty]
     private string _processorType = "";
-    [ObservableProperty] 
+    [ObservableProperty]
     private int _tagCount;
 
+    [ObservableProperty]
+    private ObservableCollection<string> _xRefContextOptions = ["Controller"];
+    [ObservableProperty]
+    private string _xRefContext = "Controller";
+    [ObservableProperty]
+    private string _xRefTagInput = "";
+    [ObservableProperty]
+    private ObservableCollection<XRefRowViewModel> _xRefResults = [];
+    [ObservableProperty]
+    private int _activeTab = 0;
+
+
+    public void LoadRoutineDatabase(IL5XContent content)
+    {
+        RoutineDb = RoutineDatabase.Build(content);
+        TagDb = TagDatabase.Build(content.Controller, RoutineDb);
+        var references = TagDb?.GetReferences("Simulation");
+    }
 
     public void LoadController(IController? controller)
     {
         ControllerName = controller?.Name ?? "No Controller";
         ProcessorType = controller?.ProcessorType ?? "";
-        
-        
-        
+
+        _routineNodeMap.Clear();
         TreeItems.Clear();
         _allTags.Clear();
-        
+
         TreeItems.Add(BuildControllerRootNode(controller!));
         TreeItems.Add(BuildTasksNode(controller));
         TreeItems.Add(BuildMotionsGroupsNode(controller));
         TreeItems.Add(BuildAlarmManagerNode(controller));
         TreeItems.Add(BuildAssetsNode(controller));
         TreeItems.Add(BuildIoConfigNode(controller!));
-        
 
         TagCount = _allTags.Count;
+
+        XRefContextOptions.Clear();
+        XRefContextOptions.Add("Controller");
+        foreach (var program in controller?.Programs ?? [])
+            if (program.Name is not null)
+                XRefContextOptions.Add(program.Name);
+        XRefContext = "Controller";
+        XRefTagInput = "";
+        XRefResults.Clear();
     }
 
     public static IEnumerable<(string text, string? comment, ulong number)> GetRungText(TreeNode<IRoutine> node)
@@ -150,7 +182,7 @@ public partial class MainViewModel : ObservableObject
             ? ""
             : string.Join(" ", desc.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
 
-    private static void PopulateChildren(TagViewModel parent, IEnumerable<L5X.Base.ITagMember> members, int depth = 1)
+    private static void PopulateChildren(TagViewModel parent, IEnumerable<ITagMember> members, int depth = 1)
     {
         foreach (var m in members)
         {
@@ -167,18 +199,18 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private static TreeNode BuildTasksNode(IController? controller)
+    private TreeNode BuildTasksNode(IController? controller)
     {
         var nodeMap = new Dictionary<string, TreeNode>();
-        var tasks = new TreeNode {Name = "Tasks", NodeType = "Folder"};
-        
+        var tasks = new TreeNode { Name = "Tasks", NodeType = "Folder" };
+
         if (controller is null) return tasks;
-        
+
         try
         {
             foreach (var task in controller.Tasks)
             {
-                var taskNode = new TreeNode<ITask>()
+                var taskNode = new TreeNode<ITask>
                 {
                     Name = task.Name,
                     NodeType = "Task",
@@ -186,16 +218,18 @@ public partial class MainViewModel : ObservableObject
                     Detail = BuildTaskDetail(task).ToArray()
                 };
                 tasks.Children.Add(taskNode);
-                nodeMap[task.Name!] =  taskNode;
+                nodeMap[task.Name!] = taskNode;
             }
-            //Add "Unassigned" node
+
             var unassigned = new TreeNode<ITask>
             {
                 Name = "Unassigned",
                 NodeType = "Folder",
             };
             tasks.Children.Add(unassigned);
-            
+
+            // Pass 1: build all program nodes indexed by name
+            var programNodes = new Dictionary<string, TreeNode<IProgram>>(StringComparer.OrdinalIgnoreCase);
             foreach (var program in controller.Programs)
             {
                 var programNode = new TreeNode<IProgram>
@@ -213,9 +247,11 @@ public partial class MainViewModel : ObservableObject
                         Name = routine.Name,
                         NodeType = "Routine",
                         Source = routine,
-                        Detail = [("",routine.Type)],
+                        Detail = [("", routine.Type)],
                         Parent = programNode
                     };
+
+                    _routineNodeMap[routine] = routineNode;
 
                     if (routine.Content is IFbdContent fbdContent)
                     {
@@ -236,25 +272,35 @@ public partial class MainViewModel : ObservableObject
 
                     programNode.Children.Add(routineNode);
                 }
-                
-                var parentTask = controller.Tasks.FirstOrDefault(t => t.Children.Contains(program.Name));
-                if (parentTask?.Name != null && nodeMap.TryGetValue(parentTask.Name, out var taskNode))
-                    taskNode.Children.Add(programNode);
-                else
-                    unassigned.Children.Add(programNode);
-                
-                
+
+                if (program.Name is not null)
+                    programNodes[program.Name] = programNode;
             }
+
+            // Pass 2: attach programs to tasks in ScheduledPrograms order
+            foreach (var task in controller.Tasks)
+            {
+                if (!nodeMap.TryGetValue(task.Name!, out var taskNode)) continue;
+                foreach (var scheduledName in task.Children)
+                    if (programNodes.TryGetValue(scheduledName, out var progNode))
+                        taskNode.Children.Add(progNode);
+            }
+
+            // Attach unassigned programs in Programs-section order
+            var scheduled = controller.Tasks.SelectMany(t => t.Children)
+                                            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var program in controller.Programs)
+                if (program.Name is not null && !scheduled.Contains(program.Name))
+                    if (programNodes.TryGetValue(program.Name, out var progNode))
+                        unassigned.Children.Add(progNode);
         }
         catch (Exception e)
         {
-            tasks = new TreeNode {Name = "Programs", NodeType = "Folder"};
+            tasks = new TreeNode { Name = "Programs", NodeType = "Folder" };
             Console.WriteLine($"Failed to Build Programs Node: {e}");
         }
 
         return tasks;
-
-        
     }
     
     private static TreeNode BuildIoConfigNode(IController controller)
@@ -369,14 +415,58 @@ public partial class MainViewModel : ObservableObject
         return results;
     }
 
-    partial void OnTagFilterChanged(string value)
+    [RelayCommand]
+    private void CopyTagName(TagViewModel? tag)
     {
-        VisibleTags?.Refresh();
+        if (!string.IsNullOrEmpty(tag?.Name))
+            Clipboard.SetText(tag.Name);
+    }
+
+    [RelayCommand]
+    private void OpenXRef(TagViewModel? tag)
+    {
+        if (string.IsNullOrEmpty(tag?.Name)) return;
+        XRefTagInput = tag.Name;
+        ActiveTab = 1;
+    }
+
+    partial void OnTagFilterChanged(string value) => VisibleTags?.Refresh();
+
+    partial void OnXRefTagInputChanged(string value) => RefreshXRef();
+    partial void OnXRefContextChanged(string value) => RefreshXRef();
+
+    private void RefreshXRef()
+    {
+        XRefResults.Clear();
+        if (TagDb is null || string.IsNullOrWhiteSpace(XRefTagInput)) return;
+
+        foreach (var xref in TagDb.GetReferences(XRefTagInput))
+        {
+            var routine = xref.Element.Routine;
+            var programName = routine?.Program?.Name ?? "";
+
+            if (!string.Equals(XRefContext, "Controller", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(programName, XRefContext, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            _routineNodeMap.TryGetValue(routine!, out var routineNode);
+
+            XRefResults.Add(new XRefRowViewModel
+            {
+                TagName = xref.FullOperand,
+                InstructionName = xref.InstructionName,
+                Routine = routine?.Name ?? "",
+                Program = programName,
+                Description = FlattenDescription(xref.Tag.Description),
+                RoutineNode = routineNode,
+            });
+        }
     }
 
     partial void OnSelectedNodeChanged(TreeNode? value)
     {
         if (value is null) return;
+        ActiveTab = 0;
         switch (value.NodeType)
         {
             case "Tags":

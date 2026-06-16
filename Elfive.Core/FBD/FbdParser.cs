@@ -1,4 +1,4 @@
-﻿using L5X.Base;
+﻿using Elfive.Core.L5X.Base;
 
 namespace Elfive.Core.FBD;
 
@@ -29,14 +29,17 @@ public class FbdParser
                     Id = e.Id,
                     X = e.X,
                     Y = e.Y,
-                    Arguments = ParseOperand(e.Operand).ToArray(),
+                    Operands = ParseOperand(e.Operand).ToArray(),
                     Connections = BuildConnections(e.Pins).ToArray(),
                 }).ToArray()
         };
-        //set parent, since it can't be done in the intitializer
+        //set parent references
         foreach (var element in sheet.Elements)
+        {
+            element.ParentSheet = sheet;
             foreach (var connection in element.Connections)
                 connection.Parent = element;
+        }
         
         // Build wires after all elements and connections are in place
         sheet.Wires = BuildWires(sheet, sheetData.Wires).ToArray();

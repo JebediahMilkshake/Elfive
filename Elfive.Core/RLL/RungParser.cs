@@ -1,4 +1,4 @@
-﻿using L5X.Base;
+﻿using Elfive.Core.L5X.Base;
 
 namespace Elfive.Core.RLL;
 
@@ -9,17 +9,20 @@ public struct Rung
     public string RawText { get; set; }
     public Series Root { get; set; }
     public LayoutSize Size { get; set; }
+    public IEnumerable<Instruction> Instructions => Root.Instructions;
 }
 
 public class RungParser
 {
     private string _text = "";
     private int _pos;
+    private IRoutine? _currentRoutine;
 
     public Rung[] ParseRoutineRungs(IRoutine routine)
     {
         if (routine.Content is not IRllContent rll) return [];
-        return rll.Rungs.Select(r =>
+        _currentRoutine = routine;
+        var rungs = rll.Rungs.Select(r =>
         {
             var root = Parse(r.Text ?? "");
            return new Rung
@@ -31,6 +34,8 @@ public class RungParser
                 Size = LayoutCalculator.Measure(root)
             };
         }).ToArray();
+        _currentRoutine = null;
+        return rungs;
     }
     
     private Series Parse(string rungText)
@@ -118,6 +123,6 @@ public class RungParser
             _pos++;
         }
         
-        return new Instruction { Name = name, Arguments = arguments.ToArray() };
+        return new Instruction { Name = name, Operands = arguments.ToArray(), Routine = _currentRoutine  };
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using L5X.Base;
+using Elfive.Core.L5X.Base;
 
 namespace Elfive.App;
 
@@ -21,24 +21,20 @@ public class NodeTemplateSelector : DataTemplateSelector
         return node.NodeType switch
         {
             "Tags" or "Program" => TagsTemplate,
-            "Routine" => (item is TreeNode<IRoutine> routine) ? GetRoutineTemplate(routine) : null,
+            "Routine" => item is TreeNode<IRoutine> routine ? GetRoutineTemplate(routine) : null,
             "FbdSheet" => FdbTemplate,
             "Module" or "Task" => ModuleTemplate,
-            
             _ => EmptyTemplate
         };
     }
 
-    private DataTemplate? GetRoutineTemplate(TreeNode<IRoutine> node)
-    {
-        var routine = node.Source;
-        return routine!.Content switch
+    private DataTemplate? GetRoutineTemplate(TreeNode<IRoutine> node) =>
+        node.Source!.Content switch
         {
-            IStContent => StTemplate,
+            IStContent  => StTemplate,
             IRllContent => RllTemplate,
             IFbdContent => FdbTemplate,
             ISfcContent => SfcTemplate,
-            _ => throw new NotSupportedException()
+            _           => EmptyTemplate
         };
-    }
 }

@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Elfive.Core.L5X.Base;
 using Elfive.Core.RLL;
-using L5X.Base;
 using Parallel = Elfive.Core.RLL.Parallel;
 
 namespace Elfive.App.Views;
@@ -15,7 +15,6 @@ public partial class RLLView : UserControl
     private const double RungPadding = 24;
     private int _columnCount = 12;
 
-    private readonly RungParser _parser = new();
     private readonly StackPanel _container = new();
     private readonly TextBlock _header;
     private Rung[] _displayedRungs;
@@ -52,11 +51,7 @@ public partial class RLLView : UserControl
 
     private void LoadRungs()
     {
-        var parser = new RungParser();
         _displayedRungs = [];
-
-        if (DataContext is TreeNode<IRoutine> { Source: { Content: IRllContent } routine })
-            _displayedRungs = parser.ParseRoutineRungs(routine);
 
         if (DataContext is TreeNode<IRoutine> node)
         {
@@ -64,6 +59,12 @@ public partial class RLLView : UserControl
             _header.Text = string.IsNullOrEmpty(programName)
                 ? node.Name ?? ""
                 : $"{node.Name}   —   {programName}";
+
+            if (node.Source is { } routine)
+            {
+                var vm = Window.GetWindow(this)?.DataContext as MainViewModel;
+                _displayedRungs = vm?.RoutineDb?.GetRungs(routine) ?? [];
+            }
         }
 
         _columnCount = _displayedRungs.Length > 0
@@ -200,37 +201,37 @@ public partial class RLLView : UserControl
             case Parallel parallel:
                 var branchY = y;
                 var parallelWidth = LayoutCalculator.Measure(parallel).Width;
-                const double vInset = 5.0; // gap between adjacent parallel blocks
+                const double vInset = 8.0; // gap between left rail/element and parallel bar
+                var leftBar  = x + vInset;
+                var rightBar = x + parallelWidth * cellWidth;
+
                 foreach (var branch in parallel.Branches)
                 {
                     var branchSize = LayoutCalculator.Measure(branch);
-
                     var wireY = branchY + CellHeight / 2;
-                    DrawElement(canvas, branch, x, branchY, branchSize.Width, cellWidth);
 
-                    // Extend wire to fill parallel width if branch is shorter
-                    var branchWidth = LayoutCalculator.Measure(branch).Width;
-                    if (branchWidth < parallelWidth)
+                    // Start branches at leftBar so content begins after the left bar
+                    DrawElement(canvas, branch, leftBar, branchY, branchSize.Width, cellWidth);
+
+                    // Extend wire to rightBar if branch is narrower than the parallel block
+                    var branchEnd = leftBar + branchSize.Width * cellWidth;
+                    if (branchEnd < rightBar)
                     {
-                        var wireStart = x + branchWidth * cellWidth;
-                        var wireEnd = x + parallelWidth * cellWidth;
                         canvas.Children.Add(MakeLine(
-                            wireStart, wireY, wireEnd, wireY,
+                            branchEnd, wireY, rightBar, wireY,
                             Brushes.Black, 1));
                     }
 
                     branchY += branchSize.Height * CellHeight;
                 }
 
-                // Vertical connection bars — inset from element boundaries so adjacent
-                // parallel blocks don't visually merge into a grid
+                // Vertical connection bars at left gap and true right edge of the block
                 var topWireY = y + CellHeight / 2;
                 var bottomWireY = branchY - CellHeight / 2;
                 canvas.Children.Add(MakeLine(
-                    x + vInset, topWireY, x + vInset, bottomWireY, Brushes.Black, 1));
-                var rightEdge = x + parallelWidth * cellWidth - vInset;
+                    leftBar, topWireY, leftBar, bottomWireY, Brushes.Black, 1));
                 canvas.Children.Add(MakeLine(
-                    rightEdge, topWireY, rightEdge, bottomWireY, Brushes.Black, 1));
+                    rightBar, topWireY, rightBar, bottomWireY, Brushes.Black, 1));
                 break;
         }
     }
@@ -243,8 +244,8 @@ public partial class RLLView : UserControl
 
         // Semi-opaque highlight when the instruction's tag is energized (value = 1)
         if (BoolInstructions.Contains(inst.Name)
-            && inst.Arguments.Length > 0
-            && _tagValues.TryGetValue(inst.Arguments[0], out var tagVal)
+            && inst.Operands.Length > 0
+            && _tagValues.TryGetValue(inst.Operands[0], out var tagVal)
             && tagVal == "1")
         {
             var highlight = new System.Windows.Shapes.Rectangle
@@ -291,11 +292,11 @@ public partial class RLLView : UserControl
         }
 
         // Operand label above the symbol
-        if (inst.Arguments.Length > 0)
+        if (inst.Operands.Length > 0)
         {
             var label = new TextBlock
             {
-                Text = inst.Arguments[0],
+                Text = inst.Operands[0],
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 10,
                 Foreground = Brushes.DarkSlateGray
@@ -404,11 +405,11 @@ public partial class RLLView : UserControl
         canvas.Children.Add(nameLabel);
 
         // Operands listed inside box
-        for (int i = 0; i < inst.Arguments.Length; i++)
+        for (int i = 0; i < inst.Operands.Length; i++)
         {
             var opLabel = new TextBlock
             {
-                Text = inst.Arguments[i],
+                Text = inst.Operands[i],
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 9, Foreground = Brushes.DarkSlateGray
             };

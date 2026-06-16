@@ -1,8 +1,8 @@
 ﻿using System.IO;
 using System.Windows;
 using Elfive.App.Views;
+using Elfive.Core.L5X.Base;
 using L5X;
-using L5X.Base;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -35,6 +35,13 @@ public partial class MainWindow : Window
         if (e.NewValue is TreeNode node) _viewModel.SelectedNode = node;
     }
 
+    public void NavigateToRoutineNode(TreeNode? node)
+    {
+        if (node is null) return;
+        _viewModel.SelectedNode = node;
+        // ActiveTab = 0 is set inside OnSelectedNodeChanged via SelectedNode assignment
+    }
+
     private void MenuOpen_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
@@ -55,11 +62,13 @@ public partial class MainWindow : Window
         if (!File.Exists(path)) { Console.WriteLine($"File not found at {path}"); return; }
         var content = new L5XReader().Read(path);
         Title = $"{Path.GetFileName(path)} - Elfive Logic Viewer";
-        
-        //PrintContent(content?.Controller, true);
-        
-        if (content?.Controller is { } controller)
+
+        PrintContent(content?.Controller, true);
+
+        if (content is null) return;
+        if (content.Controller is { } controller)
             _viewModel.LoadController(controller);
+        _viewModel.LoadRoutineDatabase(content);
     }
 
     public class InterfaceOnlyContractResolver :

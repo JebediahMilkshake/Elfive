@@ -1,4 +1,7 @@
-namespace L5X.Base;
+using Elfive.Core.SFC;
+using Elfive.Core.TAG;
+
+namespace Elfive.Core.L5X.Base;
 
 public interface IL5XContent
 {
@@ -28,8 +31,10 @@ public interface IRoutine
 {
     string? Name { get; }
     string Type { get; }
+    IProgram? Program { get; }
     IRoutineContent? Content { get; }
 }
+
 
 public interface IRoutineContent { }
 
@@ -54,7 +59,7 @@ public interface IStContent : IRoutineContent
     IEnumerable<IStLine> Lines { get; }
 }
 
-public interface IStLine
+public interface IStLine : IXRefElement
 {
     ulong Number { get; }
     string? Text { get; }
@@ -101,24 +106,60 @@ public interface IFbdWire
 
 public interface ISfcContent : IRoutineContent
 {
-    IEnumerable<ISfcStep> Steps { get; }
-    IEnumerable<ISfcTransition> Transitions { get; }
+    IEnumerable<ISfcStep>         Steps         { get; }
+    IEnumerable<ISfcTransition>   Transitions   { get; }
+    IEnumerable<ISfcDirectedLink> DirectedLinks { get; }
+    IEnumerable<ISfcBranch>       Branches      { get; }
+    IEnumerable<ISfcStop>         Stops         { get; }
 }
 
-public interface ISfcStep
+public interface ISfcDirectedLink
+{
+    ulong FromId { get; }
+    ulong ToId   { get; }
+}
+
+public interface ISfcBranch
+{
+    ulong          Id         { get; }
+    ulong          Y          { get; }
+    SfcBranchKind  BranchKind { get; }
+    SfcBranchFlow  Flow       { get; }
+    IEnumerable<ulong> LegIds { get; }
+}
+
+public interface ISfcStop
+{
+    ulong   Id      { get; }
+    ulong   X       { get; }
+    ulong   Y       { get; }
+    string? Operand { get; }
+}
+
+public interface ISfcStep : IXRefElement
 {
     ulong Id { get; }
     ulong X { get; }
     ulong Y { get; }
     string? Operand { get; }
+    IEnumerable<ISfcAction>? Actions { get; }
 }
 
-public interface ISfcTransition
+public interface ISfcAction
+{
+    ulong Id { get; }
+    SfcQualifier? Qualifier { get; }
+    string? Operand { get; }
+    IEnumerable<IStLine>? Body { get; }
+}
+
+public interface ISfcTransition : IXRefElement
 {
     ulong Id { get; }
     ulong X { get; }
     ulong Y { get; }
     string? Operand { get; }
+    IEnumerable<IStLine>? Condition { get; }
 }
 
 public interface IPort

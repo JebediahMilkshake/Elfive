@@ -7,7 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Elfive.Core.FBD;
-using L5X.Base;
+using Elfive.Core.L5X.Base;
 
 namespace Elfive.App.Views;
 
@@ -354,7 +354,7 @@ public class FBDViewer : UserControl
             12, FontWeights.Bold, Brushes.DarkBlue, centered: true);
 
         // Operand/tag name below type (if present)
-        var operand = el.Arguments.FirstOrDefault();
+        var operand = el.Operands.FirstOrDefault();
         if (!string.IsNullOrEmpty(operand))
         {
             AddText(operand, x + width / 2, y + 22,
@@ -404,7 +404,7 @@ public class FBDViewer : UserControl
         var x = el.X * CoordScale;
         var y = el.Y * CoordScale;
         var centerY = y + RefHeight / 2;
-        var tagName = el.Arguments.FirstOrDefault() ?? "";
+        var tagName = el.Operands.FirstOrDefault() ?? "";
 
         var stroke = isInput
             ? new SolidColorBrush(Color.FromRgb(40, 120, 60))
@@ -459,7 +459,7 @@ public class FBDViewer : UserControl
         var x = el.X * CoordScale;
         var y = el.Y * CoordScale;
         var centerY = y + RefHeight / 2;
-        var label = el.Arguments.FirstOrDefault() ?? el.Type;
+        var label = el.Operands.FirstOrDefault() ?? el.Type;
 
         var rect = new Rectangle
         {
