@@ -203,35 +203,34 @@ public partial class RLLView : UserControl
                 var parallelWidth = LayoutCalculator.Measure(parallel).Width;
                 const double vInset = 8.0; // gap between left rail/element and parallel bar
                 var leftBar  = x + vInset;
-                var rightBar = x + parallelWidth * cellWidth;
+                var rightBar = x + parallelWidth * cellWidth - vInset; // symmetric: vInset on each side
+                var topWireY = y + CellHeight / 2;
+                var bottomWireY = topWireY; // tracks first-cell center of the last branch
 
                 foreach (var branch in parallel.Branches)
                 {
                     var branchSize = LayoutCalculator.Measure(branch);
                     var wireY = branchY + CellHeight / 2;
+                    bottomWireY = wireY;
 
-                    // Start branches at leftBar so content begins after the left bar
                     DrawElement(canvas, branch, leftBar, branchY, branchSize.Width, cellWidth);
 
                     // Extend wire to rightBar if branch is narrower than the parallel block
                     var branchEnd = leftBar + branchSize.Width * cellWidth;
                     if (branchEnd < rightBar)
-                    {
                         canvas.Children.Add(MakeLine(
-                            branchEnd, wireY, rightBar, wireY,
-                            Brushes.Black, 1));
-                    }
+                            branchEnd, wireY, rightBar, wireY, Brushes.Black, 1));
 
                     branchY += branchSize.Height * CellHeight;
                 }
 
-                // Vertical connection bars at left gap and true right edge of the block
-                var topWireY = y + CellHeight / 2;
-                var bottomWireY = branchY - CellHeight / 2;
-                canvas.Children.Add(MakeLine(
-                    leftBar, topWireY, leftBar, bottomWireY, Brushes.Black, 1));
-                canvas.Children.Add(MakeLine(
-                    rightBar, topWireY, rightBar, bottomWireY, Brushes.Black, 1));
+                // Entry wire (x → leftBar) and exit wire (rightBar → allocated end) — creates gap between adjacent parallels
+                canvas.Children.Add(MakeLine(x,        topWireY, leftBar,                       topWireY, Brushes.Black, 1));
+                canvas.Children.Add(MakeLine(rightBar, topWireY, x + parallelWidth * cellWidth, topWireY, Brushes.Black, 1));
+
+                // Vertical bars span only from first branch wire center to last branch wire center
+                canvas.Children.Add(MakeLine(leftBar,  topWireY, leftBar,  bottomWireY, Brushes.Black, 1));
+                canvas.Children.Add(MakeLine(rightBar, topWireY, rightBar, bottomWireY, Brushes.Black, 1));
                 break;
         }
     }

@@ -63,7 +63,7 @@ public partial class MainWindow : Window
         var content = new L5XReader().Read(path);
         Title = $"{Path.GetFileName(path)} - Elfive Logic Viewer";
 
-        PrintContent(content?.Controller, true);
+        //PrintContent(content?.Controller, true);
 
         if (content is null) return;
         if (content.Controller is { } controller)
@@ -71,13 +71,12 @@ public partial class MainWindow : Window
         _viewModel.LoadRoutineDatabase(content);
     }
 
-    public class InterfaceOnlyContractResolver :
+    public class InterfaceOnlyContractResolver(
+        params Type[]
+            interfaces) :
         DefaultContractResolver
     {
-        private readonly IReadOnlyList<Type> _interfaces;
-
-        public InterfaceOnlyContractResolver(params Type[]
-            interfaces) => _interfaces = interfaces;
+        private readonly IReadOnlyList<Type> _interfaces = interfaces;
 
         protected override IList<JsonProperty>
             CreateProperties(Type type, MemberSerialization

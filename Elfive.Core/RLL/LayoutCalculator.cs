@@ -14,7 +14,7 @@ public static class LayoutCalculator
             },
             Parallel p => new LayoutSize
             {
-                Width = p.Branches.Count == 0 ? 0 : p.Branches.Max(e => Measure(e).Width),
+                Width = p.Branches.Count == 0 ? 1 : p.Branches.Max(e => Measure(e).Width) + 1,
                 Height = p.Branches.Sum(e => Measure(e).Height),
             },
             _ => new LayoutSize { Width = 0, Height = 0}
