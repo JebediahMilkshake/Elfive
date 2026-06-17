@@ -55,3 +55,11 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# IDE / user-specific
+.idea/
+*.DotSettings.user
+
+# Project-local outputs
+RELEASE_NOTES.md
+output.json
