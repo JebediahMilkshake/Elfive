@@ -4,7 +4,7 @@ A Windows desktop viewer for Rockwell Automation L5X files exported from Studio 
 
 ## Features
 
-- **L5X parsing** — opens L5X exports and auto-detects schema versions 32–37 (Studio 5000 v32–v37)
+- **L5X parsing** — opens L5X exports and auto-detects schema versions 32–37
 - **Project tree** — browse programs, routines, modules, and tags in a sidebar
 - **Tag browser** — hierarchical tag viewer with Name / Value / Data Type / Description columns and live text filtering
 - **Routine viewers** — dedicated views for all four IEC routine types:
@@ -18,7 +18,6 @@ A Windows desktop viewer for Rockwell Automation L5X files exported from Studio 
 ## Requirements
 
 - Windows 10/11
-- .NET 10 runtime
 
 ## Building from source
 
