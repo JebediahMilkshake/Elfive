@@ -21,7 +21,9 @@ public partial class MainViewModel : ObservableObject
     private readonly Dictionary<IRoutine, TreeNode<IRoutine>> _routineNodeMap = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<string, IProgram> _programMap = new(StringComparer.OrdinalIgnoreCase);
     private IController? _controller;
+    private readonly List<(string Message, NotificationLevel Level)> _loadDiagnostics = [];
 
+    public IReadOnlyList<(string Message, NotificationLevel Level)> LoadDiagnostics => _loadDiagnostics;
     public IReadOnlyDictionary<string, string> ControllerTagValues => _controllerTagValues;
     public RoutineDatabase? RoutineDb { get; private set; }
     public TagDatabase? TagDb { get; private set; }
@@ -65,6 +67,7 @@ public partial class MainViewModel : ObservableObject
 
     public void LoadController(IController? controller)
     {
+        _loadDiagnostics.Clear();
         _controller = controller;
         ControllerName = controller?.Name ?? "No Controller";
         ProcessorType = controller?.ProcessorType ?? "";
@@ -378,8 +381,8 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception e)
         {
-            tasks = new TreeNode { Name = "Programs", NodeType = "Folder" };
-            Console.WriteLine($"Failed to Build Programs Node: {e}");
+            tasks = new TreeNode { Name = "Tasks", NodeType = "Folder" };
+            _loadDiagnostics.Add(($"Failed to build programs tree: {e.Message}", NotificationLevel.Error));
         }
 
         return tasks;
