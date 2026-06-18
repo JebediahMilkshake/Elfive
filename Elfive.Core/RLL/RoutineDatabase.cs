@@ -32,14 +32,20 @@ public class RoutineDatabase
         var fbdParser = new FbdParser();
         var sfcParser = new SfcParser();
 
-        foreach (var program in content.Controller?.Programs ?? [])
-            foreach (var routine in program.Routines)
+        IEnumerable<IEnumerable<IRoutine>> routineSources =
+        [
+            ..content.Controller?.Programs.Select(p => p.Routines) ?? [],
+            ..content.Controller?.AddOnInstructions.Select(a => a.Routines) ?? [],
+        ];
+
+        foreach (var routines in routineSources)
+            foreach (var routine in routines)
                 db._cache[routine] = routine.Content switch
                 {
                     IRllContent => new ParsedRoutine(routine.Content, rllParser.ParseRoutineRungs(routine), null, null, null),
                     IFbdContent => new ParsedRoutine(routine.Content, null, fbdParser.ParseRoutineFbd(routine), null, null),
                     ISfcContent => new ParsedRoutine(routine.Content, null, null, sfcParser.ParseSfcRoutine(routine), null),
-                    IStContent st => new ParsedRoutine(routine.Content, null,null,null, st.Lines ),
+                    IStContent st => new ParsedRoutine(routine.Content, null, null, null, st.Lines),
                     _           => new ParsedRoutine(routine.Content, null, null, null, null),
                 };
 

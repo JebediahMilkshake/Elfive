@@ -16,12 +16,13 @@ public partial class RLLView : UserControl
     private int _columnCount = 12;
 
     private readonly StackPanel _container = new();
+    private readonly ScrollViewer _scroll;
     private readonly TextBlock _header;
     private Rung[] _displayedRungs;
     private IReadOnlyDictionary<string, string> _tagValues = new Dictionary<string, string>();
     public RLLView()
     {
-        var scroll = new ScrollViewer
+        _scroll = new ScrollViewer
         {
             Content = _container,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -41,7 +42,7 @@ public partial class RLLView : UserControl
         var dock = new DockPanel();
         DockPanel.SetDock(_header, Dock.Top);
         dock.Children.Add(_header);
-        dock.Children.Add(scroll);
+        dock.Children.Add(_scroll);
         Content = dock;
         _displayedRungs = [];
 
@@ -114,6 +115,7 @@ public partial class RLLView : UserControl
             {
                 Width = totalWidth,
                 Height = rungHeight + RungPadding,
+                Tag = rung.Number,
             };
 
             // Rung number (3 digits) to the left of the left rail
@@ -176,6 +178,19 @@ public partial class RLLView : UserControl
             }
 
             _container.Children.Add(canvas);
+        }
+    }
+
+    public void ScrollToRung(ulong rungNumber)
+    {
+        foreach (UIElement child in _container.Children)
+        {
+            if (child is not Canvas canvas || canvas.Tag is not ulong num || num != rungNumber)
+                continue;
+            var childTop = child.TranslatePoint(new Point(0, 0), _container).Y;
+            var offset = childTop + canvas.Height / 2 - _scroll.ViewportHeight / 2;
+            _scroll.ScrollToVerticalOffset(Math.Max(0, offset));
+            return;
         }
     }
 

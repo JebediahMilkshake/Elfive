@@ -12,11 +12,37 @@ public partial class RsLogix5000ContentType : IL5XContent
 
 public partial class ControllerType : IController
 {
-    IEnumerable<IProgram>   IController.Programs   => Programs?.Program     ?? [];
-    IEnumerable<IModule>    IController.Modules    => Modules?.Module       ?? [];
-    IEnumerable<ITag>       IController.Tags       => Tags?.Tag             ?? [];
-    IEnumerable<ITask>      IController.Tasks      => Tasks?.Task           ?? [];
-    IEnumerable<IDataType>  IController.DataTypes  => DataTypes?.DataType   ?? [];
+    IEnumerable<IProgram>         IController.Programs          => Programs?.Program                                    ?? [];
+    IEnumerable<IModule>          IController.Modules           => Modules?.Module                                      ?? [];
+    IEnumerable<ITag>             IController.Tags              => Tags?.Tag                                            ?? [];
+    IEnumerable<ITask>            IController.Tasks             => Tasks?.Task                                          ?? [];
+    IEnumerable<IDataType>        IController.DataTypes         => DataTypes?.DataType                                  ?? [];
+    IEnumerable<IAoiDefinition>   IController.AddOnInstructions => AddOnInstructionDefinitions?.AddOnInstructionDefinition ?? [];
+}
+
+public partial class AoiDefinitionType : IAoiDefinition
+{
+    string  IAoiDefinition.Name        => Name;
+    string? IAoiDefinition.Description => Description is { } d ? string.Concat(d.Text ?? []) : null;
+    string? IAoiDefinition.Revision    => Revision;
+    string? IAoiDefinition.Vendor      => Vendor;
+
+    IEnumerable<ITagMember> IAoiDefinition.Parameters => Parameters.Select(p => (ITagMember)new TagMember
+    {
+        Name        = p.Name,
+        DataType    = p.Dimensions is { Length: > 0 } dims ? $"{p.DataType}[{dims}]" : p.DataType,
+        Value       = p.Usage.ToString(),
+        Description = p.Description.FirstOrDefault() is { } d ? string.Concat(d.Text ?? []) : null,
+    });
+
+    IEnumerable<ITagMember> IAoiDefinition.LocalTags => LocalTags.Select(lt => (ITagMember)new TagMember
+    {
+        Name        = lt.Name,
+        DataType    = lt.Dimensions is { Length: > 0 } dims ? $"{lt.DataType}[{dims}]" : lt.DataType,
+        Description = lt.Description.FirstOrDefault() is { } d ? string.Concat(d.Text ?? []) : null,
+    });
+
+    IEnumerable<IRoutine> IAoiDefinition.Routines => Routines?.Routine ?? [];
 }
 
 public partial class DataTypeType : IDataType

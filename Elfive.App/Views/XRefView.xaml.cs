@@ -15,8 +15,7 @@ public partial class XRefView : UserControl
     {
         if (ResultsGrid.SelectedItem is not XRefRowViewModel row) return;
         if (row.RoutineNode is null) return;
-        if (
-            Window.GetWindow(this) is MainWindow win)
-            win.NavigateToRoutineNode(row.RoutineNode);
+        if (Window.GetWindow(this) is MainWindow win)
+            win.NavigateToRoutineNode(row.RoutineNode, row);
     }
 }

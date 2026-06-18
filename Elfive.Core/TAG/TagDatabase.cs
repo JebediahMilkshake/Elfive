@@ -100,14 +100,16 @@ public class TagDatabase
                     if (!tagIndex.TryGetValue(GetBaseTag(operand), out var tag)) continue;
                     if (!_xrefTable.TryGetValue(tag, out var list))
                         _xrefTable[tag] = list = [];
-                    list.Add(new XRefResult(tag, instruction, operand, instruction.Name));
+                    list.Add(new XRefResult(tag, instruction, operand, instruction.Name, $"Rung {rung.Number}", rung.Number));
                 }
     }
 
-    private void ExtractStReferences(IEnumerable<IStLine> lines, Dictionary<string, ITag> tagIndex)
+    private void ExtractStReferences(IEnumerable<IStLine> lines, Dictionary<string, ITag> tagIndex, string? locationOverride = null)
     {
+        ulong linePos = 0;
         foreach (var line in lines)
         {
+            linePos++;
             var text = line.Text ?? "";
             text = BlockComment.Replace(text, " ");
             text = LineComment.Replace(text, " ");
@@ -119,7 +121,9 @@ public class TagDatabase
                 if (!tagIndex.TryGetValue(GetBaseTag(m.Value), out var tag)) continue;
                 if (!_xrefTable.TryGetValue(tag, out var list))
                     _xrefTable[tag] = list = [];
-                list.Add(new XRefResult(tag, line, m.Value, "ST"));
+                var location = locationOverride ?? $"Line {linePos}";
+                var locationIndex = locationOverride is null ? (ulong?)linePos : null;
+                list.Add(new XRefResult(tag, line, m.Value, "ST", location, locationIndex));
             }
         }
     }
@@ -133,7 +137,7 @@ public class TagDatabase
                     if (!tagIndex.TryGetValue(GetBaseTag(operand), out var tag)) continue;
                     if (!_xrefTable.TryGetValue(tag, out var list))
                         _xrefTable[tag] = list = [];
-                    list.Add(new XRefResult(tag, element, operand, element.Type));
+                    list.Add(new XRefResult(tag, element, operand, element.Type, element.Type, null));
                 }
     }
 
@@ -141,10 +145,10 @@ public class TagDatabase
     {
         foreach (var step in sheet.Steps)
             foreach (var action in step.Actions ?? [])
-                ExtractStReferences(action.Body ?? [], tagIndex);
+                ExtractStReferences(action.Body ?? [], tagIndex, step.Operand ?? $"Step {step.Id}");
 
         foreach (var trans in sheet.Transitions)
-            ExtractStReferences(trans.Condition ?? [], tagIndex);
+            ExtractStReferences(trans.Condition ?? [], tagIndex, trans.Operand ?? $"Trans {trans.Id}");
     }
 
     private static string GetBaseTag(string operand)
@@ -158,7 +162,9 @@ public record XRefResult(
     ITag Tag,
     IXRefElement Element,
     string FullOperand,
-    string InstructionName
+    string InstructionName,
+    string Location,
+    ulong? LocationIndex
 );
 
 public interface IXRefElement

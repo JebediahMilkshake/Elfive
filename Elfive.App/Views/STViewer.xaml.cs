@@ -80,6 +80,15 @@ public partial class STViewer : UserControl
         LoadSyntaxHighlighting();
     }
 
+    public void ScrollToLine(ulong lineNumber)
+    {
+        int line = (int)Math.Max(1, lineNumber);
+        if (line > _editor.Document.LineCount) return;
+        var docLine = _editor.Document.GetLineByNumber(line);
+        _editor.Select(docLine.Offset, docLine.Length);
+        _editor.ScrollToLine(line);
+    }
+
     private static void OnRoutineHeaderChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         // header text is bound directly — no imperative update needed

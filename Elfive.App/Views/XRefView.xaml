@@ -39,6 +39,7 @@
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Tag Name"    Binding="{Binding TagName}"        Width="180"/>
                 <DataGridTextColumn Header="Instruction" Binding="{Binding InstructionName}" Width="100"/>
+                <DataGridTextColumn Header="Location"    Binding="{Binding Location}"        Width="120"/>
                 <DataGridTextColumn Header="Routine"     Binding="{Binding Routine}"         Width="160"/>
                 <DataGridTextColumn Header="Program"     Binding="{Binding Program}"         Width="160"/>
                 <DataGridTextColumn Header="Description" Binding="{Binding Description}"     Width="*"/>

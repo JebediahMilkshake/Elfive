@@ -20,6 +20,7 @@ public partial class MainViewModel : ObservableObject
     private readonly Dictionary<string, string> _controllerTagValues = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<IRoutine, TreeNode<IRoutine>> _routineNodeMap = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<string, IProgram> _programMap = new(StringComparer.OrdinalIgnoreCase);
+    private IController? _controller;
 
     public IReadOnlyDictionary<string, string> ControllerTagValues => _controllerTagValues;
     public RoutineDatabase? RoutineDb { get; private set; }
@@ -64,6 +65,7 @@ public partial class MainViewModel : ObservableObject
 
     public void LoadController(IController? controller)
     {
+        _controller = controller;
         ControllerName = controller?.Name ?? "No Controller";
         ProcessorType = controller?.ProcessorType ?? "";
 
@@ -125,7 +127,63 @@ public partial class MainViewModel : ObservableObject
     {
         var assetNode = new TreeNode { Name = "Assets", NodeType = "Folder" };
 
-        assetNode.Children.Add(new TreeNode { Name = "Add-On Instructions", NodeType = "Folder" });
+        var aoiFolder = new TreeNode { Name = "Add-On Instructions", NodeType = "Folder" };
+        foreach (var aoi in controller?.AddOnInstructions ?? [])
+        {
+            var aoiNode = new TreeNode<IAoiDefinition>
+            {
+                Name   = aoi.Name,
+                NodeType = "AddOnInstruction",
+                Source = aoi,
+                Detail = BuildAoiDetail(aoi).ToArray(),
+            };
+
+            var logicNode = new TreeNode { Name = "Logic", NodeType = "Folder" };
+            foreach (var routine in aoi.Routines)
+            {
+                var routineNode = new TreeNode<IRoutine>
+                {
+                    Name     = routine.Name,
+                    NodeType = "Routine",
+                    Source   = routine,
+                    Detail   = [("", routine.Type)],
+                    Parent   = aoiNode,
+                };
+                _routineNodeMap[routine] = routineNode;
+
+                if (routine.Content is IFbdContent fbdContent)
+                {
+                    foreach (var sheet in fbdContent.Sheets)
+                    {
+                        var label = string.IsNullOrEmpty(sheet.Description)
+                            ? $"Sheet {sheet.Number}"
+                            : $"Sheet {sheet.Number}: {sheet.Description}";
+                        routineNode.Children.Add(new TreeNode<IFbdSheet>
+                        {
+                            Name     = label,
+                            NodeType = "FbdSheet",
+                            Source   = sheet,
+                            Parent   = routineNode,
+                        });
+                    }
+                }
+
+                logicNode.Children.Add(routineNode);
+            }
+
+            var tagsNode = new TreeNode<IAoiDefinition>
+            {
+                Name     = "Local Tags and Parameters",
+                NodeType = "AoiParameters",
+                Source   = aoi,
+            };
+
+            aoiNode.Children.Add(logicNode);
+            aoiNode.Children.Add(tagsNode);
+            aoiFolder.Children.Add(aoiNode);
+        }
+        assetNode.Children.Add(aoiFolder);
+
         var dataTypesNode = new TreeNode { Name = "Data Types", NodeType = "Folder" };
         assetNode.Children.Add(dataTypesNode);
 
@@ -146,6 +204,16 @@ public partial class MainViewModel : ObservableObject
         dataTypesNode.Children.Add(new TreeNode { Name = "Module-Defined", NodeType = "Folder" });
 
         return assetNode;
+    }
+
+    private static IEnumerable<(string name, string value)> BuildAoiDetail(IAoiDefinition aoi)
+    {
+        if (!string.IsNullOrEmpty(aoi.Description))
+            yield return ("Description", aoi.Description!);
+        if (!string.IsNullOrEmpty(aoi.Revision))
+            yield return ("Revision", aoi.Revision!);
+        if (!string.IsNullOrEmpty(aoi.Vendor))
+            yield return ("Vendor", aoi.Vendor!);
     }
 
     private TreeNode BuildControllerRootNode(IController? controller)
@@ -468,6 +536,8 @@ public partial class MainViewModel : ObservableObject
             {
                 TagName = xref.FullOperand,
                 InstructionName = xref.InstructionName,
+                Location = xref.Location,
+                LocationIndex = xref.LocationIndex,
                 Routine = routine?.Name ?? "",
                 Program = routine?.Program?.Name ?? "",
                 Description = FlattenDescription(xref.Tag.Description),
@@ -500,6 +570,10 @@ public partial class MainViewModel : ObservableObject
             case "DataType":
                 if (value is TreeNode<IDataType> dtNode)
                     LoadDataTypeMembers(dtNode.Source);
+                break;
+            case "AoiParameters":
+                if (value is TreeNode<IAoiDefinition> aoiNode)
+                    LoadAoiParameters(aoiNode.Source);
                 break;
         }
     }
@@ -542,6 +616,40 @@ public partial class MainViewModel : ObservableObject
             PopulateChildren(vm, childMembers);
             _allTags.Add(vm);
         }
+
+        VisibleTags?.Refresh();
+    }
+
+    private void LoadAoiParameters(IAoiDefinition? aoi)
+    {
+        _allTags.Clear();
+        if (aoi is null) return;
+
+        // Sealed/protected AOIs omit the DataType string attribute; fall back to the
+        // matching UDT (Studio 5000 creates a UDT with the same name for every AOI).
+        var udtMembers = _controller?.DataTypes
+            .FirstOrDefault(dt => dt.Name.Equals(aoi.Name, StringComparison.OrdinalIgnoreCase))
+            ?.Members
+            .ToDictionary(m => m.Name ?? "", m => m.DataType, StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var p in aoi.Parameters)
+            _allTags.Add(new TagViewModel
+            {
+                Name        = p.Name        ?? "",
+                DataType    = p.DataType is { Length: > 0 } ? p.DataType : (udtMembers.GetValueOrDefault(p.Name ?? "") ?? ""),
+                Usage       = p.Value       ?? "",
+                Description = p.Description ?? "",
+            });
+
+        foreach (var lt in aoi.LocalTags)
+            _allTags.Add(new TagViewModel
+            {
+                Name        = lt.Name        ?? "",
+                DataType    = lt.DataType is { Length: > 0 } ? lt.DataType : (udtMembers.GetValueOrDefault(lt.Name ?? "") ?? ""),
+                Usage       = "Local Tag",
+                Description = lt.Description ?? "",
+            });
 
         VisibleTags?.Refresh();
     }

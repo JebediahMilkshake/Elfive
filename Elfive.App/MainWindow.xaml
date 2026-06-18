@@ -63,7 +63,7 @@
                         Padding="0"
                         BorderThickness="0,1,0,0">
                 <TabItem Header="Controller">
-                    <ContentControl Content="{Binding SelectedNode}">
+                    <ContentControl x:Name="RoutineContent" Content="{Binding SelectedNode}">
                         <ContentControl.Resources>
 
                             <!-- When nothing is selected -->
@@ -255,6 +255,130 @@
                                 </DockPanel>
                             </DataTemplate>
 
+                            <!-- When AOI Local Tags and Parameters is selected -->
+                            <DataTemplate x:Key="AoiParametersTemplate">
+                                <DockPanel>
+                                    <Grid DockPanel.Dock="Top" Margin="4">
+                                        <TextBox x:Name="AoiFilterBox"
+                                                 Text="{Binding DataContext.TagFilter,
+                                                    RelativeSource={RelativeSource AncestorType=Window},
+                                                    UpdateSourceTrigger=PropertyChanged}"
+                                                 Padding="4" />
+                                        <TextBlock Text="Filter..."
+                                                   Foreground="DarkGray"
+                                                   Margin="6,5"
+                                                   IsHitTestVisible="False"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding DataContext.TagFilter, RelativeSource={RelativeSource AncestorType=Window}}" Value=""/>
+                                                                <Condition Binding="{Binding IsFocused, ElementName=AoiFilterBox}" Value="False"/>
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </MultiDataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                    <Border DockPanel.Dock="Top"
+                                            Background="{x:Static SystemColors.ControlBrush}"
+                                            BorderBrush="{x:Static SystemColors.ControlDarkBrush}"
+                                            BorderThickness="0,1,0,1">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="200"/>
+                                                <ColumnDefinition Width="1"/>
+                                                <ColumnDefinition Width="150"/>
+                                                <ColumnDefinition Width="1"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="1"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Name"        FontWeight="SemiBold" Padding="20,3,4,3"/>
+                                            <Rectangle Grid.Column="1" Fill="{x:Static SystemColors.ControlDarkBrush}"/>
+                                            <TextBlock Grid.Column="2" Text="Usage"       FontWeight="SemiBold" Padding="4,3"/>
+                                            <Rectangle Grid.Column="3" Fill="{x:Static SystemColors.ControlDarkBrush}"/>
+                                            <TextBlock Grid.Column="4" Text="Data Type"   FontWeight="SemiBold" Padding="4,3"/>
+                                            <Rectangle Grid.Column="5" Fill="{x:Static SystemColors.ControlDarkBrush}"/>
+                                            <TextBlock Grid.Column="6" Text="Description" FontWeight="SemiBold" Padding="4,3"/>
+                                        </Grid>
+                                    </Border>
+                                    <TreeView ItemsSource="{Binding DataContext.VisibleTags,
+                                                  RelativeSource={RelativeSource AncestorType=Window}}"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                        <TreeView.ItemContainerStyle>
+                                            <Style TargetType="TreeViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="IsExpanded" Value="False"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="TreeViewItem">
+                                                            <StackPanel>
+                                                                <Border x:Name="Bd" Background="Transparent">
+                                                                    <ContentPresenter x:Name="PART_Header"
+                                                                                      ContentSource="Header"
+                                                                                      HorizontalAlignment="Stretch"/>
+                                                                </Border>
+                                                                <ItemsPresenter x:Name="ItemsHost" Margin="0"/>
+                                                            </StackPanel>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsExpanded" Value="False">
+                                                                    <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsSelected" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background"
+                                                                            Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                                                </Trigger>
+                                                                <MultiTrigger>
+                                                                    <MultiTrigger.Conditions>
+                                                                        <Condition Property="IsSelected" Value="True"/>
+                                                                        <Condition Property="IsSelectionActive" Value="False"/>
+                                                                    </MultiTrigger.Conditions>
+                                                                    <Setter TargetName="Bd" Property="Background"
+                                                                            Value="{DynamicResource {x:Static SystemColors.InactiveSelectionHighlightBrushKey}}"/>
+                                                                </MultiTrigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </TreeView.ItemContainerStyle>
+                                        <TreeView.Resources>
+                                            <HierarchicalDataTemplate DataType="{x:Type local:TagViewModel}"
+                                                                      ItemsSource="{Binding Children}">
+                                                <Border BorderBrush="{x:Static SystemColors.ControlDarkBrush}"
+                                                        BorderThickness="0,0,0,1"
+                                                        Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="200"/>
+                                                            <ColumnDefinition Width="1"/>
+                                                            <ColumnDefinition Width="150"/>
+                                                            <ColumnDefinition Width="1"/>
+                                                            <ColumnDefinition Width="120"/>
+                                                            <ColumnDefinition Width="1"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding Name}"        Padding="20,2,4,2" TextTrimming="CharacterEllipsis"/>
+                                                        <Rectangle Grid.Column="1" Fill="{x:Static SystemColors.ControlLightBrush}" VerticalAlignment="Stretch"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Usage}"       Padding="4,2"/>
+                                                        <Rectangle Grid.Column="3" Fill="{x:Static SystemColors.ControlLightBrush}" VerticalAlignment="Stretch"/>
+                                                        <TextBlock Grid.Column="4" Text="{Binding DataType}"    Padding="4,2"/>
+                                                        <Rectangle Grid.Column="5" Fill="{x:Static SystemColors.ControlLightBrush}" VerticalAlignment="Stretch"/>
+                                                        <TextBlock Grid.Column="6" Text="{Binding Description}" Padding="4,2"/>
+                                                    </Grid>
+                                                </Border>
+                                            </HierarchicalDataTemplate>
+                                        </TreeView.Resources>
+                                    </TreeView>
+                                </DockPanel>
+                            </DataTemplate>
+
                             <!-- When a Routine is selected: show its content -->
                             <DataTemplate x:Key="StTemplate">
                                 <views:STViewer
@@ -290,6 +414,7 @@
                             <local:NodeTemplateSelector
                                 EmptyTemplate="{StaticResource EmptyTemplate}"
                                 TagsTemplate="{StaticResource TagsTemplate}"
+                                AoiParametersTemplate="{StaticResource AoiParametersTemplate}"
                                 StTemplate="{StaticResource StTemplate}"
                                 FdbTemplate="{StaticResource FbdTemplate}"
                                 RllTemplate="{StaticResource RllTemplate}"

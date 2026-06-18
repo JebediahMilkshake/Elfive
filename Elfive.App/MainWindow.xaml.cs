@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Windows;
+using System.Windows.Media;
 using Elfive.App.Views;
 using Elfive.Core.L5X.Base;
 using L5X;
@@ -35,11 +36,44 @@ public partial class MainWindow : Window
         if (e.NewValue is TreeNode node) _viewModel.SelectedNode = node;
     }
 
-    public void NavigateToRoutineNode(TreeNode? node)
+    public void NavigateToRoutineNode(TreeNode? node, XRefRowViewModel? xref = null)
     {
         if (node is null) return;
         _viewModel.SelectedNode = node;
-        // ActiveTab = 0 is set inside OnSelectedNodeChanged via SelectedNode assignment
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+            () => _viewModel.ActiveTab = 0);
+        if (xref is not null)
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+                () => ScrollToXRef(xref));
+    }
+
+    private void ScrollToXRef(XRefRowViewModel xref)
+    {
+        if (xref.LocationIndex is { } index)
+        {
+            if (FindDescendant<RLLView>(RoutineContent) is { } rll)
+                rll.ScrollToRung(index);
+            else if (FindDescendant<STViewer>(RoutineContent) is { } st)
+                st.ScrollToLine(index);
+        }
+        else if (!string.IsNullOrEmpty(xref.Location))
+        {
+            if (FindDescendant<SFCViewer>(RoutineContent) is { } sfc)
+                sfc.ScrollToElement(xref.Location);
+        }
+    }
+
+    private static T? FindDescendant<T>(DependencyObject? parent) where T : DependencyObject
+    {
+        if (parent is null) return null;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T result) return result;
+            var deeper = FindDescendant<T>(child);
+            if (deeper is not null) return deeper;
+        }
+        return null;
     }
 
     private void MenuOpen_Click(object sender, RoutedEventArgs e)

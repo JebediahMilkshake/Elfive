@@ -14,11 +14,12 @@ public interface IController
 {
     string? Name { get; }
     string? ProcessorType { get; }
-    IEnumerable<IProgram>  Programs  { get; }
-    IEnumerable<IModule>   Modules   { get; }
-    IEnumerable<ITag>      Tags      { get; }
-    IEnumerable<ITask>     Tasks     { get; }
-    IEnumerable<IDataType> DataTypes { get; }
+    IEnumerable<IProgram>         Programs          { get; }
+    IEnumerable<IModule>          Modules           { get; }
+    IEnumerable<ITag>             Tags              { get; }
+    IEnumerable<ITask>            Tasks             { get; }
+    IEnumerable<IDataType>        DataTypes         { get; }
+    IEnumerable<IAoiDefinition>   AddOnInstructions { get; }
 }
 
 public interface IProgram
@@ -215,6 +216,17 @@ public interface IDataType
     string Name { get; }
     string? Description { get; }
     IEnumerable<ITagMember> Members { get; }
+}
+
+public interface IAoiDefinition
+{
+    string Name { get; }
+    string? Description { get; }
+    string? Revision { get; }
+    string? Vendor { get; }
+    IEnumerable<ITagMember> Parameters { get; }
+    IEnumerable<ITagMember> LocalTags  { get; }
+    IEnumerable<IRoutine>   Routines   { get; }
 }
 
 public enum TaskScanType { Continuous, Periodic, Event }

@@ -42,6 +42,7 @@ public class SFCViewer : UserControl
     // ID → (centerX, topY, bottomY) for all positioned elements (steps, transitions, stops, branches)
     private record ElementInfo(double CX, double TopY, double BottomY);
     private readonly Dictionary<ulong, ElementInfo> _positions = new();
+    private readonly Dictionary<string, ElementInfo> _positionsByName = new(StringComparer.OrdinalIgnoreCase);
 
     // Leg ID → position on branch bar
     private readonly Dictionary<ulong, double> _legX = new();
@@ -136,6 +137,15 @@ public class SFCViewer : UserControl
         _scroll.Cursor = Cursors.Arrow;
     }
 
+    public void ScrollToElement(string name)
+    {
+        if (!_positionsByName.TryGetValue(name, out var info)) return;
+        var cx = info.CX * _zoom;
+        var cy = ((info.TopY + info.BottomY) / 2) * _zoom;
+        _scroll.ScrollToHorizontalOffset(Math.Max(0, cx - _scroll.ViewportWidth / 2));
+        _scroll.ScrollToVerticalOffset(Math.Max(0, cy - _scroll.ViewportHeight / 2));
+    }
+
     // ── Load / header ─────────────────────────────────────────────────────────
 
     private void Load()
@@ -157,6 +167,7 @@ public class SFCViewer : UserControl
     {
         _canvas.Children.Clear();
         _positions.Clear();
+        _positionsByName.Clear();
         _legX.Clear();
         _legY.Clear();
 
@@ -179,13 +190,17 @@ public class SFCViewer : UserControl
             var y  = s.Y * CoordScale;
             var actionCount = s.Actions?.Count() ?? 0;
             var totalH = StepHeight + actionCount * ActionRowH;
-            _positions[s.Id] = new ElementInfo(x + StepWidth / 2, y, y + totalH);
+            var info = new ElementInfo(x + StepWidth / 2, y, y + totalH);
+            _positions[s.Id] = info;
+            if (s.Operand is not null) _positionsByName[s.Operand] = info;
         }
         foreach (var t in transitions)
         {
             var x = t.X * CoordScale;
             var y = t.Y * CoordScale;
-            _positions[t.Id] = new ElementInfo(x + TransWidth / 2, y, y + TransHeight);
+            var info = new ElementInfo(x + TransWidth / 2, y, y + TransHeight);
+            _positions[t.Id] = info;
+            if (t.Operand is not null) _positionsByName[t.Operand] = info;
         }
         foreach (var stop in stops)
         {
