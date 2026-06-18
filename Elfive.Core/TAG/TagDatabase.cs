@@ -20,12 +20,14 @@ public class TagDatabase
     private static readonly Regex LineComment   = new(@"//.*$", RegexOptions.Multiline | RegexOptions.Compiled);
     private static readonly Regex StringLiteral = new(@"'[^']*'", RegexOptions.Compiled);
 
-    private readonly Dictionary<ITag, List<XRefResult>> _xrefTable = new();
-    private Dictionary<string, ITag> _tagIndex = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<ITag, List<XRefResult>> _xrefTable = new(ReferenceEqualityComparer.Instance);
+    private Dictionary<string, ITag> _controllerScope = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<IProgram, Dictionary<string, ITag>> _programScopes = new(ReferenceEqualityComparer.Instance);
 
-    public IEnumerable<XRefResult> GetReferences(string tagName)
+    public IEnumerable<XRefResult> GetReferences(string tagName, IProgram? context = null)
     {
-        if (!_tagIndex.TryGetValue(tagName, out var tag)) return [];
+        var tagIndex = context is null ? _controllerScope : _programScopes.GetValueOrDefault(context);
+        if (tagIndex is null || !tagIndex.TryGetValue(tagName, out var tag)) return [];
         return _xrefTable.TryGetValue(tag, out var list) ? list : [];
     }
 
@@ -39,24 +41,33 @@ public class TagDatabase
 
         var db = new TagDatabase
         {
-            _tagIndex = controller.Tags.ToDictionary(t => t.Name!, StringComparer.OrdinalIgnoreCase)
+            _controllerScope = controller.Tags
+                .Where(t => t.Name is not null)
+                .ToDictionary(t => t.Name!, StringComparer.OrdinalIgnoreCase)
         };
+
+        foreach (var program in controller.Programs)
+            db._programScopes[program] = program.Tags
+                .Where(t => t.Name is not null)
+                .ToDictionary(t => t.Name!, StringComparer.OrdinalIgnoreCase);
 
         foreach (var (routine, parsed) in rdb.All)
         {
+            var scopedIndex = BuildScopedIndex(db._controllerScope, db._programScopes, routine.Program);
+
             switch (parsed.Content)
             {
                 case IRllContent:
-                    db.ExtractRllReferences(parsed.Rungs!, db._tagIndex);
+                    db.ExtractRllReferences(parsed.Rungs!, scopedIndex);
                     break;
                 case IStContent:
-                    db.ExtractStReferences(parsed.StLines!, db._tagIndex);
+                    db.ExtractStReferences(parsed.StLines!, scopedIndex);
                     break;
                 case IFbdContent:
-                    db.ExtractFbdReferences(parsed.FbdSheets!, db._tagIndex);
+                    db.ExtractFbdReferences(parsed.FbdSheets!, scopedIndex);
                     break;
                 case ISfcContent:
-                    db.ExtractSfcReferences(parsed.SfcSheet!, db._tagIndex);
+                    db.ExtractSfcReferences(parsed.SfcSheet!, scopedIndex);
                     break;
                 default:
                     Console.WriteLine($"Content type \"{parsed.Content?.GetType()}\" for {routine.Name} not supported.");
@@ -65,6 +76,19 @@ public class TagDatabase
         }
 
         return db;
+    }
+
+    private static Dictionary<string, ITag> BuildScopedIndex(
+        Dictionary<string, ITag> controllerScope,
+        Dictionary<IProgram, Dictionary<string, ITag>> programScopes,
+        IProgram? program)
+    {
+        var combined = new Dictionary<string, ITag>(controllerScope, StringComparer.OrdinalIgnoreCase);
+        // Program tags shadow same-named controller tags within this routine's scope
+        if (program is not null && programScopes.TryGetValue(program, out var programTags))
+            foreach (var kv in programTags)
+                combined[kv.Key] = kv.Value;
+        return combined;
     }
 
     private void ExtractRllReferences(IEnumerable<Rung> rungs, Dictionary<string, ITag> tagIndex)

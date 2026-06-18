@@ -19,6 +19,7 @@ public partial class MainViewModel : ObservableObject
     private readonly List<TagViewModel> _allTags = [];
     private readonly Dictionary<string, string> _controllerTagValues = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<IRoutine, TreeNode<IRoutine>> _routineNodeMap = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<string, IProgram> _programMap = new(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyDictionary<string, string> ControllerTagValues => _controllerTagValues;
     public RoutineDatabase? RoutineDb { get; private set; }
@@ -79,11 +80,15 @@ public partial class MainViewModel : ObservableObject
 
         TagCount = _allTags.Count;
 
+        _programMap.Clear();
         XRefContextOptions.Clear();
         XRefContextOptions.Add("Controller");
         foreach (var program in controller?.Programs ?? [])
             if (program.Name is not null)
+            {
                 XRefContextOptions.Add(program.Name);
+                _programMap[program.Name] = program;
+            }
         XRefContext = "Controller";
         XRefTagInput = "";
         XRefResults.Clear();
@@ -426,6 +431,9 @@ public partial class MainViewModel : ObservableObject
     private void OpenXRef(TagViewModel? tag)
     {
         if (string.IsNullOrEmpty(tag?.Name)) return;
+        XRefContext = SelectedNode is TreeNode<IProgram> progNode && progNode.Source?.Name is { } name
+            ? name
+            : "Controller";
         XRefTagInput = tag.Name;
         ActiveTab = 1;
     }
@@ -440,15 +448,11 @@ public partial class MainViewModel : ObservableObject
         XRefResults.Clear();
         if (TagDb is null || string.IsNullOrWhiteSpace(XRefTagInput)) return;
 
-        foreach (var xref in TagDb.GetReferences(XRefTagInput))
+        _programMap.TryGetValue(XRefContext, out var context);
+
+        foreach (var xref in TagDb.GetReferences(XRefTagInput, context))
         {
             var routine = xref.Element.Routine;
-            var programName = routine?.Program?.Name ?? "";
-
-            if (!string.Equals(XRefContext, "Controller", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(programName, XRefContext, StringComparison.OrdinalIgnoreCase))
-                continue;
-
             _routineNodeMap.TryGetValue(routine!, out var routineNode);
 
             XRefResults.Add(new XRefRowViewModel
@@ -456,7 +460,7 @@ public partial class MainViewModel : ObservableObject
                 TagName = xref.FullOperand,
                 InstructionName = xref.InstructionName,
                 Routine = routine?.Name ?? "",
-                Program = programName,
+                Program = routine?.Program?.Name ?? "",
                 Description = FlattenDescription(xref.Tag.Description),
                 RoutineNode = routineNode,
             });

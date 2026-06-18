@@ -71,10 +71,7 @@ public partial class MainWindow : Window
         _viewModel.LoadRoutineDatabase(content);
     }
 
-    public class InterfaceOnlyContractResolver(
-        params Type[]
-            interfaces) :
-        DefaultContractResolver
+    public class InterfaceOnlyContractResolver(params Type[] interfaces) : DefaultContractResolver
     {
         private readonly IReadOnlyList<Type> _interfaces = interfaces;
 
