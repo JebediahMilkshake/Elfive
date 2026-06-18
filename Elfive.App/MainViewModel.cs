@@ -124,14 +124,22 @@ public partial class MainViewModel : ObservableObject
     private TreeNode BuildAssetsNode(IController? controller)
     {
         var assetNode = new TreeNode { Name = "Assets", NodeType = "Folder" };
-        
+
         assetNode.Children.Add(new TreeNode { Name = "Add-On Instructions", NodeType = "Folder" });
         var dataTypesNode = new TreeNode { Name = "Data Types", NodeType = "Folder" };
         assetNode.Children.Add(dataTypesNode);
-        
+
         assetNode.Children.Add(new TreeNode { Name = "Trends", NodeType = "Folder" });
-        
-        dataTypesNode.Children.Add(new TreeNode { Name = "User-Defined", NodeType = "Folder" });
+
+        var userDefinedNode = new TreeNode { Name = "User-Defined", NodeType = "Folder" };
+        foreach (var dt in controller?.DataTypes ?? [])
+            userDefinedNode.Children.Add(new TreeNode<IDataType>
+            {
+                Name = dt.Name,
+                NodeType = "DataType",
+                Source = dt,
+            });
+        dataTypesNode.Children.Add(userDefinedNode);
         dataTypesNode.Children.Add(new TreeNode { Name = "Strings", NodeType = "Folder" });
         dataTypesNode.Children.Add(new TreeNode { Name = "Add-On-Defined", NodeType = "Folder" });
         dataTypesNode.Children.Add(new TreeNode { Name = "Predefined", NodeType = "Folder" });
@@ -197,6 +205,7 @@ public partial class MainViewModel : ObservableObject
                 Name = m.Name ?? "",
                 Value = childMembers.Count > 0 ? "{...}" : (m.Value ?? ""),
                 DataType = m.DataType ?? "",
+                Description = m.Description ?? "",
                 Depth = depth,
             };
             PopulateChildren(child, childMembers, depth + 1);
@@ -488,6 +497,10 @@ public partial class MainViewModel : ObservableObject
                     SelectedRoutineHeader = BuildRoutineHeader(routineNode);
                 }
                 break;
+            case "DataType":
+                if (value is TreeNode<IDataType> dtNode)
+                    LoadDataTypeMembers(dtNode.Source);
+                break;
         }
     }
 
@@ -509,6 +522,27 @@ public partial class MainViewModel : ObservableObject
             PopulateChildren(vm, tagChildren);
             _allTags.Add(vm);
         }
+        VisibleTags?.Refresh();
+    }
+
+    private void LoadDataTypeMembers(IDataType? dataType)
+    {
+        _allTags.Clear();
+        if (dataType is null) return;
+
+        foreach (var member in dataType.Members)
+        {
+            var childMembers = member.Children.ToList();
+            var vm = new TagViewModel
+            {
+                Name = member.Name ?? "",
+                DataType = member.DataType ?? "",
+                Value = childMembers.Count > 0 ? "{...}" : (member.Value ?? ""),
+            };
+            PopulateChildren(vm, childMembers);
+            _allTags.Add(vm);
+        }
+
         VisibleTags?.Refresh();
     }
 

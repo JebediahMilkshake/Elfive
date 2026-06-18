@@ -14,10 +14,11 @@ public interface IController
 {
     string? Name { get; }
     string? ProcessorType { get; }
-    IEnumerable<IProgram> Programs { get; }
-    IEnumerable<IModule>  Modules  { get; }
-    IEnumerable<ITag>     Tags     { get; }
-    IEnumerable<ITask>    Tasks    { get; }
+    IEnumerable<IProgram>  Programs  { get; }
+    IEnumerable<IModule>   Modules   { get; }
+    IEnumerable<ITag>      Tags      { get; }
+    IEnumerable<ITask>     Tasks     { get; }
+    IEnumerable<IDataType> DataTypes { get; }
 }
 
 public interface IProgram
@@ -184,17 +185,19 @@ public interface IModule
 
 public interface ITagMember
 {
-    string? Name     { get; }
-    string? DataType { get; }
-    string? Value    { get; }
+    string? Name        { get; }
+    string? DataType    { get; }
+    string? Value       { get; }
+    string? Description { get; }
     IEnumerable<ITagMember> Children { get; }
 }
 
 public sealed class TagMember : ITagMember
 {
-    public string? Name     { get; init; }
-    public string? DataType { get; init; }
-    public string? Value    { get; init; }
+    public string? Name        { get; init; }
+    public string? DataType    { get; init; }
+    public string? Value       { get; init; }
+    public string? Description { get; init; }
     public IEnumerable<ITagMember> Children { get; init; } = [];
 }
 
@@ -205,6 +208,13 @@ public interface ITag
     string? DataType    { get; }
     string? Value       { get; }
     IEnumerable<ITagMember> Children { get; }
+}
+
+public interface IDataType
+{
+    string Name { get; }
+    string? Description { get; }
+    IEnumerable<ITagMember> Members { get; }
 }
 
 public enum TaskScanType { Continuous, Periodic, Event }

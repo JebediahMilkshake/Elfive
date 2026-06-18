@@ -11,10 +11,31 @@ public partial class RsLogix5000ContentType : IL5XContent
 
 public partial class ControllerType : IController
 {
-    IEnumerable<IProgram> IController.Programs => Programs?.Program ?? [];
-    IEnumerable<IModule>  IController.Modules  => Modules?.Module  ?? [];
-    IEnumerable<ITag>     IController.Tags      => Tags?.Tag        ?? [];
-    IEnumerable<ITask>    IController.Tasks     => Tasks?.Task      ?? [];
+    IEnumerable<IProgram>   IController.Programs   => Programs?.Program     ?? [];
+    IEnumerable<IModule>    IController.Modules    => Modules?.Module       ?? [];
+    IEnumerable<ITag>       IController.Tags       => Tags?.Tag             ?? [];
+    IEnumerable<ITask>      IController.Tasks      => Tasks?.Task           ?? [];
+    IEnumerable<IDataType>  IController.DataTypes  => DataTypes?.DataType   ?? [];
+}
+
+public partial class DataTypeType : IDataType
+{
+    string  IDataType.Name        => Name;
+    string? IDataType.Description => Description is { } d ? string.Concat(d.Text ?? []) : null;
+    IEnumerable<ITagMember> IDataType.Members => Members.Select(m =>
+    {
+        var isArray = m.DimensionSpecified && m.Dimension > 0;
+        var children = isArray
+            ? (IEnumerable<ITagMember>)Enumerable.Range(0, m.Dimension)
+                .Select(i => (ITagMember)new TagMember { Name = $"{m.Name}[{i}]", DataType = m.DataType })
+            : [];
+        return (ITagMember)new TagMember
+        {
+            Name = m.Name,
+            DataType = isArray ? $"{m.DataType}[{m.Dimension}]" : m.DataType,
+            Children = children,
+        };
+    });
 }
 
 public partial class ProgramType : IProgram
@@ -62,15 +83,85 @@ public partial class TagType : ITag
     string ITag.Description => Description.FirstOrDefault() is { } d ? string.Concat(d.Text ?? []) : string.Empty;
     string? ITag.Value => Data.FirstOrDefault(d => d.Format == "Decorated")
         ?.DataValue.FirstOrDefault()?.Value;
-    IEnumerable<ITagMember> ITag.Children =>
-        Data.FirstOrDefault(d => d.Format == "Decorated")
-            ?.Structure.SelectMany(BuildMembers) ?? [];
 
-    private static IEnumerable<ITagMember> BuildMembers(DataStructure s) =>
-        s.DataValueMember.Select(m => (ITagMember)new TagMember
-            { Name = m.Name, DataType = m.DataType, Value = m.Value })
+    IEnumerable<ITagMember> ITag.Children
+    {
+        get
+        {
+            var decorated = Data.FirstOrDefault(d => d.Format == "Decorated");
+            if (decorated is null) return [];
+
+            if (decorated.Structure.Count > 0)
+            {
+                var comments = BuildCommentMap();
+                return decorated.Structure.SelectMany(s => BuildMembers(s, comments, ""));
+            }
+
+            var bitCount = DataType switch { "SINT" => 8, "INT" => 16, "DINT" => 32, "LINT" => 64, _ => 0 };
+            if (bitCount > 0 && long.TryParse(decorated.DataValue.FirstOrDefault()?.Value, out var intVal))
+            {
+                var comments = BuildCommentMap();
+                return Enumerable.Range(0, bitCount).Select(i =>
+                {
+                    comments.TryGetValue(i.ToString(), out var desc);
+                    return (ITagMember)new TagMember
+                        { Name = $"{Name}.{i}", DataType = "BOOL", Value = ((intVal >> i) & 1L).ToString(), Description = desc };
+                });
+            }
+
+            return [];
+        }
+    }
+
+    private IReadOnlyDictionary<string, string> BuildCommentMap() =>
+        Comments.SelectMany(cc => cc.Comment)
+            .Where(c => c.Operand is not null)
+            .ToDictionary(c => c.Operand!, c => string.Concat(c.Text ?? []), StringComparer.OrdinalIgnoreCase);
+
+    private static IEnumerable<ITagMember> BuildMembers(DataStructure s, IReadOnlyDictionary<string, string> comments, string prefix) =>
+        s.DataValueMember.Select(m =>
+        {
+            var bitCount = m.DataType switch
+            {
+                "SINT" => 8, "INT" => 16, "DINT" => 32, "LINT" => 64, _ => 0
+            };
+            var bitChildren = bitCount > 0 && long.TryParse(m.Value, out var intVal)
+                ? (IEnumerable<ITagMember>)Enumerable.Range(0, bitCount)
+                    .Select(i =>
+                    {
+                        comments.TryGetValue($"{prefix}{m.Name}.{i}", out var desc);
+                        return (ITagMember)new TagMember
+                            { Name = $"{m.Name}.{i}", DataType = "BOOL", Value = ((intVal >> i) & 1L).ToString(), Description = desc };
+                    })
+                : [];
+            return (ITagMember)new TagMember
+                { Name = m.Name, DataType = m.DataType, Value = m.Value, Children = bitChildren };
+        })
         .Concat(s.StructureMember.Select(sm => new TagMember
-            { Name = sm.Name, DataType = sm.DataType, Children = BuildMembers(sm).ToList() }));
+            { Name = sm.Name, DataType = sm.DataType, Children = BuildMembers(sm, comments, $"{prefix}{sm.Name}.").ToList() }))
+        .Concat(s.ArrayMember.Select(am => new TagMember
+            { Name = am.Name, DataType = $"{am.DataType}[{am.Dimensions}]", Children = BuildArrayChildren(am, comments, prefix).ToList() }));
+
+    private static IEnumerable<ITagMember> BuildArrayChildren(DataArray a, IReadOnlyDictionary<string, string> comments, string prefix)
+    {
+        if (a.Element.Count > 0)
+            return a.Element.Select(e => (ITagMember)new TagMember
+            {
+                Name = $"{a.Name}{e.Index}",
+                DataType = a.DataType,
+                Value = e.Value,
+                Children = e.Structure.SelectMany(s => BuildMembers(s, comments, $"{prefix}{a.Name}{e.Index}.")).ToList()
+            });
+
+        if (int.TryParse(a.Dimensions, out var count) && count > 0)
+            return Enumerable.Range(0, count).Select(i => (ITagMember)new TagMember
+            {
+                Name = $"{a.Name}[{i}]",
+                DataType = a.DataType,
+            });
+
+        return [];
+    }
 }
 
 public partial class RoutineType : IRoutine

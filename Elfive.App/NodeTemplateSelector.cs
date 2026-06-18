@@ -20,7 +20,7 @@ public class NodeTemplateSelector : DataTemplateSelector
 
         return node.NodeType switch
         {
-            "Tags" or "Program" => TagsTemplate,
+            "Tags" or "Program" or "DataType" => TagsTemplate,
             "Routine" => item is TreeNode<IRoutine> routine ? GetRoutineTemplate(routine) : null,
             "FbdSheet" => FdbTemplate,
             "Module" or "Task" => ModuleTemplate,
