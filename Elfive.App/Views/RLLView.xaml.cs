@@ -3,13 +3,15 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Elfive.Core.L5X.Base;
 using Elfive.Core.RLL;
+using Elfive.Core.TAG;
 using Parallel = Elfive.Core.RLL.Parallel;
 
 namespace Elfive.App.Views;
 
 public partial class RLLView : UserControl
 {
-    private const double CellHeight = 48;
+    private const double CellHeight = 64;
+    private const double BranchSpacing = 16;
     private const double RailWidth = 16;   // right-side inset
     private const double LeftMargin = 56;  // space left of left rail (rung number)
     private const double RungPadding = 24;
@@ -20,6 +22,8 @@ public partial class RLLView : UserControl
     private readonly TextBlock _header;
     private Rung[] _displayedRungs;
     private IReadOnlyDictionary<string, string> _tagValues = new Dictionary<string, string>();
+    private TagDatabase? _tagDb;
+    private IProgram? _currentProgram;
     public RLLView()
     {
         _scroll = new ScrollViewer
@@ -65,6 +69,8 @@ public partial class RLLView : UserControl
             {
                 var vm = Window.GetWindow(this)?.DataContext as MainViewModel;
                 _displayedRungs = vm?.RoutineDb?.GetRungs(routine) ?? [];
+                _tagDb = vm?.TagDb;
+                _currentProgram = routine.Program;
             }
         }
 
@@ -76,7 +82,7 @@ public partial class RLLView : UserControl
 
     private double GetCellWidth()
     {
-        var available = ActualWidth - LeftMargin - RailWidth;
+        var available = ActualWidth - LeftMargin - RailWidth - 20;
         return available > 0 ? available / _columnCount : 60;
     }
 
@@ -96,29 +102,43 @@ public partial class RLLView : UserControl
 
         foreach (var rung in _displayedRungs)
         {
-            // Rung comment header
+            // Measure comment so rails can span the full height (comment + ladder)
+            double commentHeight = 0;
+            TextBlock? commentBlock = null;
             if (!string.IsNullOrEmpty(rung.Comment))
             {
-                _container.Children.Add(new TextBlock
+                commentBlock = new TextBlock
                 {
-                    Text = $"Rung {rung.Number}: {rung.Comment}",
-                    Margin = new Thickness(LeftMargin, 8, 0, 2),
+                    Text = rung.Comment,
                     Foreground = Brushes.Green,
                     FontFamily = new FontFamily("Consolas"),
-                    FontStyle = FontStyles.Italic
-                });
+                    FontStyle = FontStyles.Italic,
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = totalWidth - LeftMargin - 16,
+                };
+                commentBlock.Measure(new Size(totalWidth - LeftMargin - 16, double.PositiveInfinity));
+                commentHeight = commentBlock.DesiredSize.Height + 12; // 6px top + 6px bottom
             }
 
-            // Ladder Render
-            var rungHeight = rung.Size.Height * CellHeight;
+            // Canvas covers comment region + ladder region + padding
+            var rungHeight = MeasurePixelHeight(rung.Root);
+            var canvasHeight = commentHeight + rungHeight + RungPadding;
             var canvas = new Canvas
             {
                 Width = totalWidth,
-                Height = rungHeight + RungPadding,
+                Height = canvasHeight,
                 Tag = rung.Number,
             };
 
-            // Rung number (3 digits) to the left of the left rail
+            // Comment inside canvas, indented slightly past left rail
+            if (commentBlock != null)
+            {
+                Canvas.SetLeft(commentBlock, LeftMargin + 24);
+                Canvas.SetTop(commentBlock, 6);
+                canvas.Children.Add(commentBlock);
+            }
+
+            // Rung number centred on the ladder section (below the comment)
             var rungLabel = new TextBlock
             {
                 Text = rung.Number.ToString("D3"),
@@ -128,17 +148,17 @@ public partial class RLLView : UserControl
             };
             rungLabel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             Canvas.SetLeft(rungLabel, 4);
-            Canvas.SetTop(rungLabel, rungHeight / 2 - rungLabel.DesiredSize.Height / 2);
+            Canvas.SetTop(rungLabel, commentHeight + rungHeight / 2 - rungLabel.DesiredSize.Height / 2);
             canvas.Children.Add(rungLabel);
 
-            // Left rail
+            // Left rail — full height including comment
             canvas.Children.Add(MakeLine(
-                leftRailX, 0, leftRailX, rungHeight + RungPadding,
+                leftRailX, 0, leftRailX, canvasHeight,
                 Brushes.DarkBlue, 2));
 
-            // Right rail
+            // Right rail — full height including comment
             canvas.Children.Add(MakeLine(
-                rightRailX, 0, rightRailX, rungHeight + RungPadding,
+                rightRailX, 0, rightRailX, canvasHeight,
                 Brushes.DarkBlue, 2));
 
             // Draw rung content — output instructions pinned to right rail
@@ -153,27 +173,29 @@ public partial class RLLView : UserControl
                 foreach (var el in rung.Root.Elements.Take(rung.Root.Elements.Count - 1))
                 {
                     var elW = LayoutCalculator.Measure(el).Width;
-                    DrawElement(canvas, el, inputX, 0, elW, cellWidth);
+                    DrawElement(canvas, el, inputX, commentHeight, elW, cellWidth);
                     inputX += elW * cellWidth;
                 }
 
                 // Wire bridging input end to output start
                 if (inputX < outputStartX)
                     canvas.Children.Add(MakeLine(
-                        inputX, CellHeight / 2, outputStartX, CellHeight / 2,
+                        inputX, commentHeight + CellHeight / 2,
+                        outputStartX, commentHeight + CellHeight / 2,
                         Brushes.Black, 1));
 
                 // Draw output at right rail
-                DrawElement(canvas, output, outputStartX, 0, outputWidth, cellWidth);
+                DrawElement(canvas, output, outputStartX, commentHeight, outputWidth, cellWidth);
             }
             else
             {
-                DrawElement(canvas, rung.Root, leftRailX, 0, rung.Size.Width, cellWidth);
+                DrawElement(canvas, rung.Root, leftRailX, commentHeight, rung.Size.Width, cellWidth);
 
                 var contentEndX = leftRailX + rung.Size.Width * cellWidth;
                 if (contentEndX < rightRailX)
                     canvas.Children.Add(MakeLine(
-                        contentEndX, CellHeight / 2, rightRailX, CellHeight / 2,
+                        contentEndX, commentHeight + CellHeight / 2,
+                        rightRailX, commentHeight + CellHeight / 2,
                         Brushes.Black, 1));
             }
 
@@ -279,6 +301,10 @@ public partial class RLLView : UserControl
 
         var midX = x + cellWidth / 2;
 
+        var description = inst.Operands.Length > 0
+            ? _tagDb?.GetDescription(inst.Operands[0], _currentProgram)
+            : null;
+
         // Categorize and draw the symbol
         switch (inst.Name.ToUpper())
         {
@@ -301,7 +327,7 @@ public partial class RLLView : UserControl
                 DrawContact(canvas, midX, centerY, false, "↑");
                 break;
             default: // Everything else: box instruction
-                DrawBoxInstruction(canvas, inst, x, y, cellWidth);
+                DrawBoxInstruction(canvas, inst, x, y, cellWidth, description);
                 return; // skip the operand label below
         }
 
@@ -313,12 +339,32 @@ public partial class RLLView : UserControl
                 Text = inst.Operands[0],
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 10,
-                Foreground = Brushes.DarkSlateGray
+                Foreground = Brushes.DarkSlateGray,
+                MaxWidth = cellWidth,
+                TextTrimming = TextTrimming.CharacterEllipsis
             };
             label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             Canvas.SetLeft(label, midX - label.DesiredSize.Width / 2);
             Canvas.SetTop(label, centerY - 12 - label.DesiredSize.Height);
             canvas.Children.Add(label);
+
+            if (!string.IsNullOrEmpty(description))
+            {
+                var descLabel = new TextBlock
+                {
+                    Text = description,
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize = 8,
+                    FontStyle = FontStyles.Italic,
+                    Foreground = Brushes.Gray,
+                    MaxWidth = cellWidth,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                descLabel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                Canvas.SetLeft(descLabel, midX - descLabel.DesiredSize.Width / 2);
+                Canvas.SetTop(descLabel, centerY - 12 - label.DesiredSize.Height - 2 - descLabel.DesiredSize.Height);
+                canvas.Children.Add(descLabel);
+            }
         }
     }
 
@@ -392,7 +438,7 @@ public partial class RLLView : UserControl
     }
 
     private void DrawBoxInstruction(Canvas canvas, Instruction inst,
-        double x, double y, double cellWidth)
+        double x, double y, double cellWidth, string? description = null)
     {
         var margin = 12.0;
         var rect = new System.Windows.Shapes.Rectangle
@@ -417,6 +463,25 @@ public partial class RLLView : UserControl
         Canvas.SetLeft(nameLabel, x + margin + 4);
         Canvas.SetTop(nameLabel, y + 6);
         canvas.Children.Add(nameLabel);
+
+        // Description above the box
+        if (!string.IsNullOrEmpty(description))
+        {
+            var descLabel = new TextBlock
+            {
+                Text = description,
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 8,
+                FontStyle = FontStyles.Italic,
+                Foreground = Brushes.Gray,
+                MaxWidth = cellWidth,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+            descLabel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            Canvas.SetLeft(descLabel, x + cellWidth / 2 - descLabel.DesiredSize.Width / 2);
+            Canvas.SetTop(descLabel, y + 4 - 2 - descLabel.DesiredSize.Height);
+            canvas.Children.Add(descLabel);
+        }
 
         // Operands listed inside box
         for (int i = 0; i < inst.Operands.Length; i++)
