@@ -31,6 +31,15 @@ public class TagDatabase
         return _xrefTable.TryGetValue(tag, out var list) ? list : [];
     }
 
+    public string? GetDescription(string tagName, IProgram? program = null)
+    {
+        var baseTag = GetBaseTag(tagName);
+        if (program is not null && _programScopes.TryGetValue(program, out var scope)
+            && scope.TryGetValue(baseTag, out var pt))
+            return pt.Description;
+        return _controllerScope.TryGetValue(baseTag, out var ct) ? ct.Description : null;
+    }
+
     public static TagDatabase? Build(IController? controller, RoutineDatabase rdb)
     {
         if (controller is null)
