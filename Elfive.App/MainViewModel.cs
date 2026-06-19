@@ -72,6 +72,11 @@ public partial class MainViewModel : ObservableObject
         ControllerName = controller?.Name ?? "No Controller";
         ProcessorType = controller?.ProcessorType ?? "";
 
+        SelectedNode = null;
+        SelectedRoutineContent = "";
+        SelectedRoutineHeader = "";
+        SelectedTags.Clear();
+
         _routineNodeMap.Clear();
         TreeItems.Clear();
         _allTags.Clear();

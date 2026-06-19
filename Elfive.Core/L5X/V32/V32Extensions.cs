@@ -242,7 +242,9 @@ public partial class RllContentType : IRllContent
 
 public partial class RungType : IRung
 {
-    string? IRung.Comment => Comment?.Value?.FirstOrDefault();
+    string? IRung.Comment => Comment?.LocalizedComment?.FirstOrDefault() is { } lc
+        ? lc.Value.FirstOrDefault() ?? lc.Text?.FirstOrDefault()
+        : Comment?.Value?.FirstOrDefault() ?? Comment?.Text?.FirstOrDefault();
 }
 // Structured Text
 
