@@ -216,41 +216,52 @@ public partial class RLLView : UserControl
         }
     }
 
-    private void DrawElement(Canvas canvas, IRungElement element,
+    private static double MeasurePixelHeight(IRungElement element) => element switch
+    {
+        Instruction   => CellHeight,
+        Series s      => s.Elements.Count > 0 ? s.Elements.Max(MeasurePixelHeight) : CellHeight,
+        Parallel p    => p.Branches.Sum(MeasurePixelHeight) + Math.Max(0, p.Branches.Count - 1) * BranchSpacing,
+        _             => CellHeight,
+    };
+
+    private double DrawElement(Canvas canvas, IRungElement element,
         double x, double y, int elementWidth, double cellWidth)
     {
         switch (element)
         {
             case Instruction inst:
                 DrawInstruction(canvas, inst, x, y, cellWidth);
-                break;
+                return CellHeight;
 
             case Series series:
                 var seriesX = x;
+                var maxH = 0.0;
                 foreach (var child in series.Elements)
                 {
                     var childSize = LayoutCalculator.Measure(child);
-                    DrawElement(canvas, child, seriesX, y, childSize.Width, cellWidth);
+                    var h = DrawElement(canvas, child, seriesX, y, childSize.Width, cellWidth);
+                    maxH = Math.Max(maxH, h);
                     seriesX += childSize.Width * cellWidth;
                 }
-                break;
+                return maxH > 0 ? maxH : CellHeight;
 
             case Parallel parallel:
                 var branchY = y;
                 var parallelWidth = LayoutCalculator.Measure(parallel).Width;
-                const double vInset = 8.0; // gap between left rail/element and parallel bar
+                const double vInset = 8.0;
                 var leftBar  = x + vInset;
-                var rightBar = x + parallelWidth * cellWidth - vInset; // symmetric: vInset on each side
+                var rightBar = x + parallelWidth * cellWidth - vInset;
                 var topWireY = y + CellHeight / 2;
-                var bottomWireY = topWireY; // tracks first-cell center of the last branch
+                var bottomWireY = topWireY;
 
-                foreach (var branch in parallel.Branches)
+                for (var bi = 0; bi < parallel.Branches.Count; bi++)
                 {
+                    var branch = parallel.Branches[bi];
                     var branchSize = LayoutCalculator.Measure(branch);
                     var wireY = branchY + CellHeight / 2;
                     bottomWireY = wireY;
 
-                    DrawElement(canvas, branch, leftBar, branchY, branchSize.Width, cellWidth);
+                    var branchH = DrawElement(canvas, branch, leftBar, branchY, branchSize.Width, cellWidth);
 
                     // Extend wire to rightBar if branch is narrower than the parallel block
                     var branchEnd = leftBar + branchSize.Width * cellWidth;
@@ -258,17 +269,23 @@ public partial class RLLView : UserControl
                         canvas.Children.Add(MakeLine(
                             branchEnd, wireY, rightBar, wireY, Brushes.Black, 1));
 
-                    branchY += branchSize.Height * CellHeight;
+                    branchY += branchH;
+                    if (bi < parallel.Branches.Count - 1)
+                        branchY += BranchSpacing;
                 }
 
-                // Entry wire (x → leftBar) and exit wire (rightBar → allocated end) — creates gap between adjacent parallels
+                // Entry wire (x → leftBar) and exit wire (rightBar → allocated end)
                 canvas.Children.Add(MakeLine(x,        topWireY, leftBar,                       topWireY, Brushes.Black, 1));
                 canvas.Children.Add(MakeLine(rightBar, topWireY, x + parallelWidth * cellWidth, topWireY, Brushes.Black, 1));
 
-                // Vertical bars span only from first branch wire center to last branch wire center
+                // Vertical bars span from first branch wire center to last branch wire center
                 canvas.Children.Add(MakeLine(leftBar,  topWireY, leftBar,  bottomWireY, Brushes.Black, 1));
                 canvas.Children.Add(MakeLine(rightBar, topWireY, rightBar, bottomWireY, Brushes.Black, 1));
-                break;
+
+                return branchY - y;
+
+            default:
+                return CellHeight;
         }
     }
 
