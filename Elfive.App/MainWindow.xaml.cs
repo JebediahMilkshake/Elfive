@@ -7,6 +7,7 @@ using L5X;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+using Color = System.Windows.Media.Color;
 
 namespace Elfive.App;
 
@@ -93,17 +94,90 @@ public partial class MainWindow : Window
 
     private void LoadProject(string path)
     {
-        if (!File.Exists(path)) { Console.WriteLine($"File not found at {path}"); return; }
-        var content = new L5XReader().Read(path);
+        DismissNotification();
+
+        if (!File.Exists(path))
+        {
+            if (!string.IsNullOrEmpty(path))
+                ShowNotification($"File not found: {path}", NotificationLevel.Error);
+            return;
+        }
+
+        IL5XContent content;
+        try
+        {
+            content = new L5XReader().Read(path);
+        }
+        catch (NotSupportedException ex)
+        {
+            ShowNotification(ex.Message, NotificationLevel.Error);
+            return;
+        }
+        catch (Exception ex)
+        {
+            ShowNotification($"Failed to read L5X file: {ex.Message}", NotificationLevel.Error);
+            return;
+        }
+
         Title = $"{Path.GetFileName(path)} - Elfive Logic Viewer";
 
-        //PrintContent(content?.Controller, true);
+        if (content.Controller is null)
+        {
+            ShowNotification(
+                "The L5X file contains no controller. The project may be empty or was exported without controller data.",
+                NotificationLevel.Warning);
+            return;
+        }
 
-        if (content is null) return;
-        if (content.Controller is { } controller)
-            _viewModel.LoadController(controller);
-        _viewModel.LoadRoutineDatabase(content);
+        try
+        {
+            _viewModel.LoadController(content.Controller);
+            _viewModel.LoadRoutineDatabase(content);
+        }
+        catch (Exception ex)
+        {
+            ShowNotification($"Failed to load project data: {ex.Message}", NotificationLevel.Error);
+            return;
+        }
+
+        foreach (var (message, level) in _viewModel.LoadDiagnostics)
+            ShowNotification(message, level);
+
+        if (_viewModel.LoadDiagnostics.Count == 0 && !content.Controller.Programs.Any())
+            ShowNotification("Project loaded, but no programs were found.", NotificationLevel.Warning);
     }
+
+    public void ShowNotification(string message, NotificationLevel level)
+    {
+        var (bg, accent, label) = level switch
+        {
+            NotificationLevel.Warning => (
+                Color.FromRgb(255, 248, 225),
+                Color.FromRgb(202, 138, 4),
+                "Warning:"),
+            NotificationLevel.Error => (
+                Color.FromRgb(255, 235, 238),
+                Color.FromRgb(185, 28, 28),
+                "Error:"),
+            _ => (
+                Color.FromRgb(219, 234, 254),
+                Color.FromRgb(29, 78, 216),
+                "Info:")
+        };
+
+        NotificationBanner.Background = new SolidColorBrush(bg);
+        NotificationBanner.BorderBrush = new SolidColorBrush(accent);
+        NotificationLabel.Foreground = new SolidColorBrush(accent);
+        NotificationLabel.Text = label;
+        NotificationText.Text = message;
+        NotificationBanner.Visibility = Visibility.Visible;
+    }
+
+    private void DismissNotification() =>
+        NotificationBanner.Visibility = Visibility.Collapsed;
+
+    private void NotificationClose_Click(object sender, RoutedEventArgs e) =>
+        DismissNotification();
 
     public class InterfaceOnlyContractResolver(params Type[] interfaces) : DefaultContractResolver
     {
