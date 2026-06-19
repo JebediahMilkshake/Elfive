@@ -23,13 +23,9 @@ public class L5XReader
 
         return major switch
         {
-            32 => Deserialize<V32.RsLogix5000ContentType>(path),
-            33 => Deserialize<V33.RsLogix5000ContentType>(path),
-            34 => Deserialize<V34.RsLogix5000ContentType>(path),
-            35 => Deserialize<V35.RsLogix5000ContentType>(path),
-            36 => Deserialize<V36.RsLogix5000ContentType>(path),
-            37 => Deserialize<V37.RsLogix5000ContentType>(path),
-            _ => throw new NotSupportedException($"L5X schema version {major} is not supported. Supported versions: 32–37.")
+            24 or 32 or 33 => Deserialize<Schema1.RsLogix5000ContentType>(path),
+            >= 34          => Deserialize<Schema2.RsLogix5000ContentType>(path),
+            _ => throw new NotSupportedException($"L5X schema version {major} is not supported. Supported versions: 24, 32–37.")
         };
     }
     

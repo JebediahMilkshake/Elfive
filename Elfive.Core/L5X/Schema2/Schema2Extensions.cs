@@ -2,7 +2,7 @@ using Elfive.Core.L5X.Base;
 using Elfive.Core.SFC;
 using Elfive.Core.TAG;
 
-namespace L5X.V35;
+namespace L5X.Schema2;
 
 public partial class RsLogix5000ContentType : IL5XContent
 {

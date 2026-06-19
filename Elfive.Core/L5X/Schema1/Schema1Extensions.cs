@@ -1,8 +1,9 @@
+using System.Globalization;
 using Elfive.Core.L5X.Base;
 using Elfive.Core.SFC;
 using Elfive.Core.TAG;
 
-namespace L5X.V36;
+namespace L5X.Schema1;
 
 public partial class RsLogix5000ContentType : IL5XContent
 {
@@ -204,7 +205,7 @@ public partial class RoutineType : IRoutine
     };
     IRoutineContent? IRoutine.Content => Type switch
     {
-        RoutineTypeEnum.Rll => (IRoutineContent?)RllContent.FirstOrDefault(),
+        RoutineTypeEnum.Rll => RllContent.FirstOrDefault(),
         RoutineTypeEnum.St  => WithRoutine(StContent.FirstOrDefault()),
         RoutineTypeEnum.Fbd => FbdContent.FirstOrDefault(),
         RoutineTypeEnum.Sfc => WithSfcRoutine(SfcContent.FirstOrDefault()),
@@ -245,7 +246,6 @@ public partial class RungType : IRung
         ? lc.Value.FirstOrDefault() ?? lc.Text?.FirstOrDefault()
         : Comment?.Value?.FirstOrDefault() ?? Comment?.Text?.FirstOrDefault();
 }
-
 // Structured Text
 
 public partial class StContentType : IStContent
@@ -277,6 +277,7 @@ public partial class SheetType : IFbdSheet
     IEnumerable<IFbdElement> IFbdSheet.ICons => ICon ?? [];
     IEnumerable<IFbdElement> IFbdSheet.OCons => OCon ?? [];
     IEnumerable<IFbdWire> IFbdSheet.Wires => Wire ?? [];
+    
 }
 
 public partial class FbdElementType : IFbdElement
@@ -286,7 +287,7 @@ public partial class FbdElementType : IFbdElement
     ulong  IFbdElement.X        => X;
     ulong  IFbdElement.Y        => Y;
     string? IFbdElement.Operand => Operand;
-    string? IFbdElement.Pins    => VisiblePins ?? "";
+    string? IFbdElement.Pins => VisiblePins ?? "";
 }
 
 public partial class FbdIRefType : IFbdElement
@@ -296,7 +297,7 @@ public partial class FbdIRefType : IFbdElement
     ulong  IFbdElement.X        => X;
     ulong  IFbdElement.Y        => Y;
     string? IFbdElement.Operand => Operand;
-    string? IFbdElement.Pins    => "";
+    string? IFbdElement.Pins => "";
 }
 
 public partial class FbdORefType : IFbdElement
@@ -306,7 +307,7 @@ public partial class FbdORefType : IFbdElement
     ulong  IFbdElement.X        => X;
     ulong  IFbdElement.Y        => Y;
     string? IFbdElement.Operand => Operand;
-    string? IFbdElement.Pins    => "";
+    string? IFbdElement.Pins => "";
 }
 
 public partial class FbdIConType : IFbdElement
@@ -316,7 +317,7 @@ public partial class FbdIConType : IFbdElement
     ulong  IFbdElement.X        => X;
     ulong  IFbdElement.Y        => Y;
     string? IFbdElement.Operand => null;
-    string? IFbdElement.Pins    => "";
+    string? IFbdElement.Pins => "";
 }
 
 public partial class FbdOConType : IFbdElement
@@ -326,7 +327,7 @@ public partial class FbdOConType : IFbdElement
     ulong  IFbdElement.X        => X;
     ulong  IFbdElement.Y        => Y;
     string? IFbdElement.Operand => null;
-    string? IFbdElement.Pins    => "";
+    string? IFbdElement.Pins => "";
 }
 
 public partial class FbdWireType : IFbdWire
@@ -384,6 +385,17 @@ public partial class SfcStepType : ISfcStep
     IRoutine? IXRefElement.Routine => _routine;
 }
 
+public partial class SfcTransType : ISfcTransition
+{
+    internal IRoutine? _routine;
+    ulong  ISfcTransition.Id        => Id;
+    ulong  ISfcTransition.X         => X;
+    ulong  ISfcTransition.Y         => Y;
+    string? ISfcTransition.Operand  => Operand;
+    IEnumerable<IStLine>? ISfcTransition.Condition => Condition?.StContent?.Line;
+    IRoutine? IXRefElement.Routine => _routine;
+}
+
 public partial class SfcActionType : ISfcAction
 {
     ulong ISfcAction.Id => Id;
@@ -402,20 +414,9 @@ public partial class SfcActionType : ISfcAction
         SfcActionQualifierEnum.PulseFallingEdge or SfcActionQualifierEnum.P0 => SfcQualifier.PulseFalling,
         SfcActionQualifierEnum.StoredTimeLimited or SfcActionQualifierEnum.Sl => SfcQualifier.StoredLimited,
         SfcActionQualifierEnum.StoredTimeDelayed or SfcActionQualifierEnum.Sd => SfcQualifier.StoredDelayed,
-        SfcActionQualifierEnum.TimeDelayedStored or SfcActionQualifierEnum.Ds => SfcQualifier.DelayedStored,
+        SfcActionQualifierEnum.TimeDelayedStored or SfcActionQualifierEnum.Ds => SfcQualifier.DelayedStored, 
         _ => throw new ArgumentOutOfRangeException()
     };
-}
-
-public partial class SfcTransType : ISfcTransition
-{
-    internal IRoutine? _routine;
-    ulong  ISfcTransition.Id        => Id;
-    ulong  ISfcTransition.X         => X;
-    ulong  ISfcTransition.Y         => Y;
-    string? ISfcTransition.Operand  => Operand;
-    IEnumerable<IStLine>? ISfcTransition.Condition => Condition?.StContent?.Line;
-    IRoutine? IXRefElement.Routine => _routine;
 }
 
 // Tasks
