@@ -155,11 +155,16 @@
                                             <TextBlock Grid.Column="6" Text="Description" FontWeight="SemiBold" Padding="4,3"/>
                                         </Grid>
                                     </Border>
+                                    <Grid>
                                     <TreeView ItemsSource="{Binding DataContext.VisibleTags,
                                                   RelativeSource={RelativeSource AncestorType=Window}}"
-                                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                              VirtualizingPanel.IsVirtualizing="True"
+                                              VirtualizingPanel.VirtualizationMode="Recycling"
+                                              ScrollViewer.CanContentScroll="True">
                                         <TreeView.ItemContainerStyle>
                                             <Style TargetType="TreeViewItem">
+                                                <EventSetter Event="Expanded" Handler="TagTreeItem_Expanded"/>
                                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                                 <Setter Property="IsExpanded" Value="False"/>
                                                 <Setter Property="Template">
@@ -279,6 +284,17 @@
                                             </HierarchicalDataTemplate>
                                         </TreeView.Resources>
                                     </TreeView>
+                                    <Border Background="{x:Static SystemColors.ControlBrush}"
+                                            Opacity="0.85"
+                                            Visibility="{Binding DataContext.IsTagsLoading,
+                                                RelativeSource={RelativeSource AncestorType=Window},
+                                                Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="Loading tags..."
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="14"/>
+                                    </Border>
+                                    </Grid>
                                 </DockPanel>
                             </DataTemplate>
 
@@ -340,6 +356,7 @@
                                               ScrollViewer.HorizontalScrollBarVisibility="Auto">
                                         <TreeView.ItemContainerStyle>
                                             <Style TargetType="TreeViewItem">
+                                                <EventSetter Event="Expanded" Handler="TagTreeItem_Expanded"/>
                                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                                 <Setter Property="IsExpanded" Value="False"/>
                                                 <Setter Property="Template">

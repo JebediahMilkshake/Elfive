@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using Elfive.App.Views;
 using Elfive.Core.L5X.Base;
@@ -178,6 +179,12 @@ public partial class MainWindow : Window
 
     private void NotificationClose_Click(object sender, RoutedEventArgs e) =>
         DismissNotification();
+
+    private void TagTreeItem_Expanded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TreeViewItem { DataContext: TagViewModel tag })
+            tag.EnsureChildrenLoaded();
+    }
 
     public class InterfaceOnlyContractResolver(params Type[] interfaces) : DefaultContractResolver
     {

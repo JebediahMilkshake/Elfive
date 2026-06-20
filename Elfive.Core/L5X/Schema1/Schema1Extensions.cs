@@ -106,37 +106,38 @@ public partial class EthernetLinkType : IPort
 
 public partial class TagType : ITag
 {
+    private IReadOnlyList<ITagMember>? _cachedChildren;
+
     string ITag.Description => Description.FirstOrDefault() is { } d ? string.Concat(d.Text ?? []) : string.Empty;
     string? ITag.Value => Data.FirstOrDefault(d => d.Format == "Decorated")
         ?.DataValue.FirstOrDefault()?.Value;
 
-    IEnumerable<ITagMember> ITag.Children
+    IEnumerable<ITagMember> ITag.Children => _cachedChildren ??= ComputeChildren().ToList();
+
+    private IEnumerable<ITagMember> ComputeChildren()
     {
-        get
+        var decorated = Data.FirstOrDefault(d => d.Format == "Decorated");
+        if (decorated is null) return [];
+
+        if (decorated.Structure.Count > 0)
         {
-            var decorated = Data.FirstOrDefault(d => d.Format == "Decorated");
-            if (decorated is null) return [];
-
-            if (decorated.Structure.Count > 0)
-            {
-                var comments = BuildCommentMap();
-                return decorated.Structure.SelectMany(s => BuildMembers(s, comments, ""));
-            }
-
-            var bitCount = DataType switch { "SINT" => 8, "INT" => 16, "DINT" => 32, "LINT" => 64, _ => 0 };
-            if (bitCount > 0 && long.TryParse(decorated.DataValue.FirstOrDefault()?.Value, out var intVal))
-            {
-                var comments = BuildCommentMap();
-                return Enumerable.Range(0, bitCount).Select(i =>
-                {
-                    comments.TryGetValue(i.ToString(), out var desc);
-                    return (ITagMember)new TagMember
-                        { Name = $"{Name}.{i}", DataType = "BOOL", Value = ((intVal >> i) & 1L).ToString(), Description = desc };
-                });
-            }
-
-            return [];
+            var comments = BuildCommentMap();
+            return decorated.Structure.SelectMany(s => BuildMembers(s, comments, ""));
         }
+
+        var bitCount = DataType switch { "SINT" => 8, "INT" => 16, "DINT" => 32, "LINT" => 64, _ => 0 };
+        if (bitCount > 0 && long.TryParse(decorated.DataValue.FirstOrDefault()?.Value, out var intVal))
+        {
+            var comments = BuildCommentMap();
+            return Enumerable.Range(0, bitCount).Select(i =>
+            {
+                comments.TryGetValue(i.ToString(), out var desc);
+                return (ITagMember)new TagMember
+                    { Name = $"{Name}.{i}", DataType = "BOOL", Value = ((intVal >> i) & 1L).ToString(), Description = desc };
+            });
+        }
+
+        return [];
     }
 
     private IReadOnlyDictionary<string, string> BuildCommentMap() =>

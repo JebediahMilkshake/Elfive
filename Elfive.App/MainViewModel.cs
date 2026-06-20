@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Data;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Elfive.Core.L5X.Base;
@@ -29,6 +30,11 @@ public partial class MainViewModel : ObservableObject
     public TagDatabase? TagDb { get; private set; }
     public ICollectionView? VisibleTags { get; private set; }
 
+    private Task<List<TagViewModel>>? _controllerTagPreloadTask;
+    private int _tagLoadSequence;
+
+    [ObservableProperty]
+    private bool _isTagsLoading;
     [ObservableProperty]
     private string _tagFilter = "";
     [ObservableProperty]
@@ -67,6 +73,8 @@ public partial class MainViewModel : ObservableObject
 
     public void LoadController(IController? controller)
     {
+        _controllerTagPreloadTask = null;
+        _tagLoadSequence++;
         _loadDiagnostics.Clear();
         _controller = controller;
         ControllerName = controller?.Name ?? "No Controller";
@@ -88,7 +96,7 @@ public partial class MainViewModel : ObservableObject
         TreeItems.Add(BuildAssetsNode(controller));
         TreeItems.Add(BuildIoConfigNode(controller!));
 
-        TagCount = _allTags.Count;
+        TagCount = controller?.Tags.Count() ?? 0;
 
         _programMap.Clear();
         XRefContextOptions.Clear();
@@ -241,27 +249,18 @@ public partial class MainViewModel : ObservableObject
             NodeType = "Tags",
             Source = controller?.Tags,
         };
-        
+
         if (controller is null) return node;
 
         _controllerTagValues.Clear();
         foreach (var tag in controller.Tags)
-        {
-            var tagChildren = tag.Children.ToList();
-            var vm = new TagViewModel
-            {
-                Name = tag.Name ?? "",
-                Value = tagChildren.Count > 0 ? "{...}" : (tag.Value ?? ""),
-                DataType = tag.DataType ?? "",
-                Description = FlattenDescription(tag.Description),
-            };
-            PopulateChildren(vm, tagChildren);
-            _allTags.Add(vm);
             if (tag.Name != null)
                 _controllerTagValues[tag.Name] = tag.Value ?? "";
-        }
-        
+
         SetupTagFiltering();
+
+        var tagSource = controller.Tags;
+        _controllerTagPreloadTask = Task.Run(() => BuildTagVMs(tagSource));
 
         return node;
     }
@@ -562,11 +561,11 @@ public partial class MainViewModel : ObservableObject
         {
             case "Tags":
                 if (value is TreeNode<IEnumerable<ITag>> tagsNode)
-                    LoadTags(tagsNode.Source);
+                    _ = LoadTagsAsync(tagsNode.Source, usePreload: true);
                 break;
             case "Program":
                 if (value is TreeNode<IProgram> progNode)
-                    LoadTags(progNode.Source?.Tags);
+                    _ = LoadTagsAsync(progNode.Source?.Tags);
                 break;
             case "Routine":
                 if (value is TreeNode<IRoutine> routineNode)
@@ -586,11 +585,48 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private void LoadTags(IEnumerable<ITag>? tags)
+    private async Task LoadTagsAsync(IEnumerable<ITag>? tags, bool usePreload = false)
     {
+        var seq = ++_tagLoadSequence;
+        IsTagsLoading = true;
         _allTags.Clear();
-        if (tags is null) return;
+        VisibleTags?.Refresh();
 
+        // Yield below Render priority (7) so WPF actually renders the loading state
+        // before we proceed. Task.Yield() posts at Normal (9) which is above Render,
+        // so it would NOT give WPF a render cycle — this does.
+        await Application.Current.Dispatcher.InvokeAsync(
+            () => { }, DispatcherPriority.ContextIdle);
+
+        if (seq != _tagLoadSequence) return;
+
+        if (tags is null)
+        {
+            IsTagsLoading = false;
+            return;
+        }
+
+        List<TagViewModel> vms;
+        if (usePreload && _controllerTagPreloadTask is { } preload)
+        {
+            _controllerTagPreloadTask = null;
+            vms = await preload;
+        }
+        else
+        {
+            vms = await Task.Run(() => BuildTagVMs(tags));
+        }
+
+        if (seq != _tagLoadSequence) return;
+
+        _allTags.AddRange(vms);
+        IsTagsLoading = false;
+        VisibleTags?.Refresh();
+    }
+
+    private static List<TagViewModel> BuildTagVMs(IEnumerable<ITag> tags)
+    {
+        var list = new List<TagViewModel>();
         foreach (var tag in tags)
         {
             var tagChildren = tag.Children.ToList();
@@ -601,10 +637,11 @@ public partial class MainViewModel : ObservableObject
                 DataType = tag.DataType ?? "",
                 Description = FlattenDescription(tag.Description),
             };
-            PopulateChildren(vm, tagChildren);
-            _allTags.Add(vm);
+            if (tagChildren.Count > 0)
+                vm.SetPendingChildren(tagChildren);
+            list.Add(vm);
         }
-        VisibleTags?.Refresh();
+        return list;
     }
 
     private void LoadDataTypeMembers(IDataType? dataType)

@@ -60,9 +60,22 @@ public class TagDatabase
                 .Where(t => t.Name is not null)
                 .ToDictionary(t => t.Name!, StringComparer.OrdinalIgnoreCase);
 
+        Dictionary<string, ITag>? controllerOnlyScope = null;
+        var scopedByProgram = new Dictionary<IProgram, Dictionary<string, ITag>>(ReferenceEqualityComparer.Instance);
+
         foreach (var (routine, parsed) in rdb.All)
         {
-            var scopedIndex = BuildScopedIndex(db._controllerScope, db._programScopes, routine.Program);
+            Dictionary<string, ITag> scopedIndex;
+            if (routine.Program is null)
+            {
+                controllerOnlyScope ??= BuildScopedIndex(db._controllerScope, db._programScopes, null);
+                scopedIndex = controllerOnlyScope;
+            }
+            else
+            {
+                if (!scopedByProgram.TryGetValue(routine.Program, out scopedIndex!))
+                    scopedByProgram[routine.Program] = scopedIndex = BuildScopedIndex(db._controllerScope, db._programScopes, routine.Program);
+            }
 
             switch (parsed.Content)
             {
